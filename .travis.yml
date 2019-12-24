@@ -1,0 +1,21 @@
+language: rust
+cache: cargo
+env: 
+- TARGET=x86_64-unknown-linux-gnu
+addons:
+  apt:
+    packages:
+    - libusb-1.0
+    - libusb-dev
+install:
+- cargo fetch
+- rustup target add armv7-unknown-linux-gnueabihf
+- rustup component add rustfmt
+script:
+- cargo build && cargo test && cargo build --target=$TARGET --release
+before_deploy:
+- tar -cvf target/streamdeck-cli-$TARGET-$TRAVIS_TAG.tgz -C target/$TARGET/release/ streamdeck-cli
+notifications:
+  email:
+    on_success: never
+    on_failure: never

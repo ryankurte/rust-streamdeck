@@ -5,6 +5,11 @@ An [hidapi](https://crates.io/crates/hidapi) based driver for direct interaction
 
 ## Status
 
+[![GitHub tag](https://img.shields.io/github/tag/ryankurte/rust-streamdeck.svg)](https://github.com/ryankurte/rust-streamdeck)
+[![Travis Build Status](https://travis-ci.org/ryankurte/rust-streamdeck.svg?branch=master)](https://travis-ci.org/ryankurte/rust-streamdeck)
+[![Crates.io](https://img.shields.io/crates/v/streamdeck.svg)](https://crates.io/crates/streamdeck)
+[![Docs.rs](https://docs.rs/streamdeck/badge.svg)](https://docs.rs/streamdeck)
+
 WIP. Pull requests more than welcome!
 
 Features:
@@ -43,9 +48,12 @@ Building requires `libusb` and `hidapi` packages.
 
 ## Related Works
 
-You might like to look at:
+This library stands on the shoulders of giants (who had already done all the reversing work)...
+
+You might also like to look at:
+
 - [streamdeck-rs](https://crates.io/crates/streamdeck-rs) for writing plugins to interact with the official Elgato SDK
 - [stream_deck_rs](https://crates.io/crates/stream_deck_rs) another project with similar goals
 - [@cliffrowley's streamdeck protocol notes](https://gist.github.com/cliffrowley/d18a9c4569537b195f2b1eb6c68469e0)
 - [python streamdeck library](https://github.com/abcminiuser/python-elgato-streamdeck)
-
+- [node-elgato-stream-deck](https://github.com/Lange/node-elgato-stream-deck/blob/master/NOTES.md)
