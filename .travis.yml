@@ -1,6 +1,6 @@
 language: rust
 cache: cargo
-env: 
+env:
 - TARGET=x86_64-unknown-linux-gnu
 addons:
   apt:
@@ -14,8 +14,19 @@ install:
 script:
 - cargo build && cargo test && cargo build --target=$TARGET --release
 before_deploy:
-- tar -cvf target/streamdeck-cli-$TARGET-$TRAVIS_TAG.tgz -C target/$TARGET/release/ streamdeck-cli
+- tar -cvf target/streamdeck-cli-$TARGET-$TRAVIS_TAG.tgz -C target/$TARGET/release/
+  streamdeck-cli
 notifications:
   email:
     on_success: never
     on_failure: never
+deploy:
+  provider: releases
+  api_key:
+    secure: Ckf1VexYqDxEjJF/0XfCKQzypY92+yv2ZBLz6U+yoSQXFixKCAgjxbtuyR4nVr43sGwB9GPKSLXyqpfMrnbWdp67jU/QgB19hn+7+u6WGXhEKKq2fpgnl9SwXLcfLtdhEgRoB7YmlPONfTFgPe/u4lfrC3XH3AxsaYC1T/RVer3G+mCuode++2H9qh4LwZjhjwFRf1QpF6tAUG4v2IWL6z5ZOgkKW9/ynZ7w92GMKj75Kb8qmvhZQ4IKcswue33eM1DErccEIvrDG9eAPfNhcSpRJTOsKM5EBgDMFgJlZV10EdhJV8PpNv3AIVfIPjXr8ooLCAeomRJyXs8lxXvc4pfh66jKnkmZ9yR5WHCNI2GOPzqb0pbCho1B5ZL0y0et3VScVW8KoPsEQxoDiK+JddzNdjjz0s4WGlICkIwaTckXPKXMtU5NeyM9qRwg7MccNx7x6DEFHZSYa5/I3oF5fg7SujE2zGtp7rfU0t+qwWnAPoSu3UpJhoWv8DJU2BtdzF30Lg6xSRnSj7kjQbjJYCd6R3cU/Hkp2/33M2Wsb4rCMfH6TcfJh6DLfS/g7q9hG6OTqMifjyDbN3kG038QBJTcUZDw+Vz/M7gMtiWCFiptvGvIof36/UhGaVpJztVz/99ATaqiAbwxPsdUou0wyGsLT3Bmz27J+WFpoRAeLIo=
+  file: target/*.tgz
+  file_glob: true
+  skip_cleanup: true
+  on:
+    tags: true
+    repo: ryankurte/streamdeck-cli
