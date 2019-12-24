@@ -1,6 +1,6 @@
 # Rust Elgato StreamDeck Driver and Utility
 
-An [hidapi](https://crates.io/crates/hidapi) based driver for direct interaction with Elgato StreamDeck devices, this is intended to allow applications to use these devices directly and on arbitrary platforms (without the use of the Elgato SDK).
+An [hidapi](https://crates.io/crates/hidapi) based driver for direct interaction with Elgato StreamDeck devices, this is intended to allow applications to use these devices directly and on arbitrary platforms (without the use of the Elgato SDK), heavily based on the [python streamdeck library](https://github.com/abcminiuser/python-elgato-streamdeck).
 
 
 ## Status
