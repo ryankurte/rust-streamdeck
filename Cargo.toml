@@ -2,11 +2,11 @@
 name = "streamdeck"
 description = "Elgato Stream Deck driver and command line interface"
 repository = "https://github.com/ryankurte/rust-streamdeck"
-version = "0.1.0"
 authors = ["ryan <ryan@kurte.nz>"]
-edition = "2018"
+version = "0.1.0"
+readme = "README.md"
 license = "MPL-2.0"
-
+edition = "2018"
 
 [features]
 util = [ "structopt", "simplelog", "humantime" ]
