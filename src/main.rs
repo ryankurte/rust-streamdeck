@@ -40,14 +40,17 @@ fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
 }
 
 #[derive(StructOpt)]
-
 pub enum Commands {
+    /// Reset the attached device
     Reset,
+    /// Fetch the device firmware version
     Version,
+    /// Set device display brightness
     SetBrightness{
         /// Brightness value from 0 to 100
         brightness: u8,
     },
+    /// Fetch button states
     GetButtons {
         #[structopt(long)]
         /// Timeout for button reading
@@ -57,6 +60,7 @@ pub enum Commands {
         /// Read continuously
         continuous: bool,
     },
+    /// Set button colours
     SetColour {
         /// Index of button to be set
         key: u8,
@@ -80,7 +84,10 @@ fn main() {
     let opts = Options::from_args();
 
     // Setup logging
-    TermLogger::init(opts.level, simplelog::Config::default(), TerminalMode::Mixed).unwrap();
+    let mut config = simplelog::ConfigBuilder::new();
+    config.set_time_level(LevelFilter::Off);
+
+    TermLogger::init(opts.level, config.build(), TerminalMode::Mixed).unwrap();
 
     // Connect to device
     let mut deck = match StreamDeck::connect(opts.vid, opts.pid, opts.serial) {
