@@ -9,7 +9,7 @@ use structopt::StructOpt;
 extern crate humantime;
 use humantime::Duration;
 
-use streamdeck::{StreamDeck, Filter, Error};
+use streamdeck::{StreamDeck, Filter, Colour, ImageOptions, Error};
 
 #[derive(StructOpt)]
 #[structopt(name = "streamdeck-cli", about = "A CLI for the Elgato StreamDeck")]
@@ -52,17 +52,18 @@ pub enum Commands {
         /// Index of button to be set
         key: u8,
 
-        #[structopt(short, long, default_value="0")]
-        /// Red channel
-        red: u8,
+        #[structopt(flatten)]
+        colour: Colour,
+    },
+    SetImage {
+        /// Index of button to be set
+        key: u8,
 
-        #[structopt(short, long, default_value="0")]
-        /// Blue channel
-        blue: u8,
+        /// Image file to be loaded
+        file: String,
 
-        #[structopt(short, long, default_value="0")]
-        /// Green channel
-        green: u8,
+        #[structopt(flatten)]
+        opts: ImageOptions,
     }
 }
 
@@ -117,9 +118,13 @@ fn do_command(deck: &mut StreamDeck, cmd: Commands) -> Result<(), Error> {
                 }
             }
         },
-        Commands::SetColour{key, red, green, blue} => {
-            info!("Setting key {} colour to: (r: {} g: {} b: {})", key, red, green, blue);
-            deck.set_button_rgb(key, red, green, blue)?;
+        Commands::SetColour{key, colour} => {
+            info!("Setting key {} colour to: ({:?})", key, colour);
+            deck.set_button_rgb(key, colour)?;
+        },
+        Commands::SetImage{key, file, opts} => {
+            info!("Setting key {} to image: {}", key, file);
+            deck.set_button_file(key, &file, opts)?;
         }
     }
 

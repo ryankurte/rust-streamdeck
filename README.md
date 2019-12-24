@@ -86,3 +86,5 @@ You might also like to look at:
 - [@cliffrowley's streamdeck protocol notes](https://gist.github.com/cliffrowley/d18a9c4569537b195f2b1eb6c68469e0)
 - [python streamdeck library](https://github.com/abcminiuser/python-elgato-streamdeck)
 - [node-elgato-stream-deck](https://github.com/Lange/node-elgato-stream-deck/blob/master/NOTES.md)
+
+[Icons](icons/) from [material.io](https://material.io) and [brandeps.com](https://www.brandeps.com)

@@ -1,11 +1,18 @@
 
 use std::time::Duration;
+use std::io::{Error as IoError};
 
 #[macro_use]
 extern crate log;
 
 extern crate hidapi;
 use hidapi::{HidApi, HidDevice, HidError};
+
+extern crate image;
+use image::ImageError;
+
+pub mod images;
+pub use crate::images::{Colour, ImageOptions};
 
 pub mod info;
 pub use info::*;
@@ -20,15 +27,15 @@ pub struct StreamDeck {
 #[cfg(feature = "structopt" )]
 #[derive(structopt::StructOpt)]
 pub struct Filter {
-    #[structopt(long, default_value="0fd9", parse(try_from_str=u16_parse_hex))]
+    #[structopt(long, default_value="0fd9", parse(try_from_str=u16_parse_hex), env="USB_VID")]
     /// USB Device Vendor ID (VID) in hex
     pub vid: u16,
 
-    #[structopt(long, default_value="0063", parse(try_from_str=u16_parse_hex))]
+    #[structopt(long, default_value="0063", parse(try_from_str=u16_parse_hex), env="USB_PID")]
     /// USB Device Product ID (PID) in hex
     pub pid: u16,
 
-    #[structopt(long)]
+    #[structopt(long, env="USB_SERIAL")]
     /// USB Device Serial
     pub serial: Option<String>,
 }
@@ -40,6 +47,9 @@ fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
 #[derive(Debug)]
 pub enum Error {
     Hid(HidError),
+    Io(IoError),
+    Image(ImageError),
+
     InvalidImageSize,
     InvalidKeyIndex,
     UnrecognisedPID,
@@ -184,14 +194,14 @@ impl StreamDeck {
     }
 
     /// Set a button to the provided RGB colour
-    pub fn set_button_rgb(&mut self, key: u8, r: u8, g: u8, b: u8) -> Result<(), Error> {
+    pub fn set_button_rgb(&mut self, key: u8, colour: &Colour) -> Result<(), Error> {
         let mut image = vec![0u8; self.kind.image_size_bytes() ];
 
         for i in 0..image.len() {
             match i % 3 {
-                0 => image[i] = b,
-                1 => image[i] = g,
-                2 => image[i] = r,
+                0 => image[i] = colour.b,
+                1 => image[i] = colour.g,
+                2 => image[i] = colour.r,
                 _ => unreachable!(),
             };
         }
@@ -209,6 +219,17 @@ impl StreamDeck {
             ImageMode::Bmp => self.set_button_image_bmp(key, image),
             ImageMode::Jpeg => unimplemented!(),
         }
+    }
+
+    pub fn set_button_file(&mut self, key: u8, image: &str, opts: &ImageOptions) -> Result<(), Error> {
+        let (x, y) = self.kind.image_size();
+        let rotate = self.kind.image_rotation();
+
+        let image = images::load_image(image, x, y, rotate, opts)?;
+
+        self.set_button_image(key, &image)?;
+
+        Ok(())
     }
 
     /// Internal function to set images for bitmap based devices

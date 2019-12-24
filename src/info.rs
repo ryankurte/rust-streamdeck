@@ -15,6 +15,12 @@ pub enum ImageMode {
     Jpeg,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Rotation {
+    Rot0,
+    Rot90,
+}
+
 const ORIGINAL_IMAGE_REPORT_LEN: usize = 8191;
 const MINI_IMAGE_REPORT_LEN: usize = 1024;
 
@@ -39,6 +45,13 @@ impl Kind {
             Kind::Original | Kind::OriginalV2 => (72, 72),
             Kind::Mini => (80, 80),
             Kind::Xl => (96, 96),
+        }
+    }
+
+    pub fn image_rotation(&self) -> bool {
+        match self {
+            Kind::Mini => true,
+            _ => false,
         }
     }
 
