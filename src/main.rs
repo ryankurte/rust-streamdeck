@@ -120,11 +120,11 @@ fn do_command(deck: &mut StreamDeck, cmd: Commands) -> Result<(), Error> {
         },
         Commands::SetColour{key, colour} => {
             info!("Setting key {} colour to: ({:?})", key, colour);
-            deck.set_button_rgb(key, colour)?;
+            deck.set_button_rgb(key, &colour)?;
         },
         Commands::SetImage{key, file, opts} => {
             info!("Setting key {} to image: {}", key, file);
-            deck.set_button_file(key, &file, opts)?;
+            deck.set_button_file(key, &file, &opts)?;
         }
     }
 
