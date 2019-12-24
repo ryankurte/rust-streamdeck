@@ -45,6 +45,35 @@ Building requires `libusb` and `hidapi` packages.
   - note this may need to be edited with other vid/pid combinations for other devices
 - `sudo udevadm control --reload-rules` to reload udev rules
 
+### Using the CLI
+
+`streamdeck-cli --help` displays available commands and options.
+
+```
+streamdeck-cli 0.1.0
+A CLI for the Elgato StreamDeck
+
+USAGE:
+    streamdeck-cli [OPTIONS] <SUBCOMMAND>
+
+FLAGS:
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+        --log-level <level>    Enable verbose logging [default: info]
+        --pid <pid>            USB Device Product ID (PID) in hex [default: 0063]
+        --serial <serial>      USB Device Serial
+        --vid <vid>            USB Device Vendor ID (VID) in hex [default: 0fd9]
+
+SUBCOMMANDS:
+    get-buttons       Fetch button states
+    help              Prints this message or the help of the given subcommand(s)
+    reset             Reset the attached device
+    set-brightness    Set device display brightness
+    set-colour        Set button colours
+    version           Fetch the device firmware version
+```
 
 ## Related Works
 
