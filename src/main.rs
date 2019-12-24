@@ -9,7 +9,7 @@ use structopt::StructOpt;
 extern crate humantime;
 use humantime::Duration;
 
-use streamdeck::{StreamDeck, Error};
+use streamdeck::{StreamDeck, Filter, Error};
 
 #[derive(StructOpt)]
 #[structopt(name = "streamdeck-cli", about = "A CLI for the Elgato StreamDeck")]
@@ -18,25 +18,12 @@ struct Options {
     #[structopt(subcommand)]
     cmd: Commands,
 
-    #[structopt(long, default_value="0fd9", parse(try_from_str=u16_parse_hex))]
-    /// USB Device Vendor ID (VID) in hex
-    vid: u16,
-
-    #[structopt(long, default_value="0063", parse(try_from_str=u16_parse_hex))]
-    /// USB Device Product ID (PID) in hex
-    pid: u16,
-
-    #[structopt(long)]
-    /// USB Device Serial
-    serial: Option<String>,
+    #[structopt(flatten)]
+    filter: Filter,
 
     #[structopt(long = "log-level", default_value = "info")]
     /// Enable verbose logging
     level: LevelFilter,
-}
-
-fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
-    u16::from_str_radix(s, 16)
 }
 
 #[derive(StructOpt)]
@@ -90,7 +77,7 @@ fn main() {
     TermLogger::init(opts.level, config.build(), TerminalMode::Mixed).unwrap();
 
     // Connect to device
-    let mut deck = match StreamDeck::connect(opts.vid, opts.pid, opts.serial) {
+    let mut deck = match StreamDeck::connect(opts.filter.vid, opts.filter.pid, opts.filter.serial) {
         Ok(d) => d,
         Err(e) => {
             error!("Error connecting to streamdeck: {:?}", e);

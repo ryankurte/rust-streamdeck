@@ -16,12 +16,34 @@ pub struct StreamDeck {
     device: HidDevice
 }
 
+/// Helper object for filtering device connections
+#[cfg(feature = "structopt" )]
+#[derive(structopt::StructOpt)]
+pub struct Filter {
+    #[structopt(long, default_value="0fd9", parse(try_from_str=u16_parse_hex))]
+    /// USB Device Vendor ID (VID) in hex
+    pub vid: u16,
+
+    #[structopt(long, default_value="0063", parse(try_from_str=u16_parse_hex))]
+    /// USB Device Product ID (PID) in hex
+    pub pid: u16,
+
+    #[structopt(long)]
+    /// USB Device Serial
+    pub serial: Option<String>,
+}
+
+fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
+    u16::from_str_radix(s, 16)
+}
+
 #[derive(Debug)]
 pub enum Error {
     Hid(HidError),
     InvalidImageSize,
     InvalidKeyIndex,
     UnrecognisedPID,
+    NoData,
 }
 
 impl From<HidError> for Error {
@@ -149,6 +171,10 @@ impl StreamDeck {
             None => self.device.read(&mut cmd)?,
         };
 
+        if cmd[0] == 0 {
+            return Err(Error::NoData)
+        }
+
         Ok((&cmd[1..]).to_vec())
     }
 
@@ -215,7 +241,7 @@ impl StreamDeck {
             let max_chunk_size = self.kind.image_report_len() - overhead;
             let chunk_size = (image.len() - offset).min(max_chunk_size);
 
-            debug!("sequence: {}, offset: {}, chunk_size: {}, buff_size: {}", sequence, offset, chunk_size, self.kind.image_report_len());
+            trace!("sequence: {}, offset: {}, chunk_size: {}, buff_size: {}", sequence, offset, chunk_size, self.kind.image_report_len());
 
             // Build header
             let next = match chunk_size == (image.len() - offset) {
@@ -243,8 +269,8 @@ impl StreamDeck {
                 *i = 0;
             }
 
-            debug!("Writing chunk");
-            debug!("Header: {:x?}", &buff[..16]);
+            trace!("Writing chunk");
+            trace!("Header: {:x?}", &buff[..16]);
             trace!("Buffer: {:x?}", &buff[..]);
 
             self.device.write(&buff)?;
