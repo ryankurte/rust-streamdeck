@@ -121,7 +121,7 @@ mod test {
 
     #[test]
     fn load_images() {
-        let _image = load_image("./icons/power.png", 72, 72)
+        let _image = load_image("./icons/power.png", 72, 72, true, &ImageOptions::default())
             .expect("error loading image");
     }
 }
