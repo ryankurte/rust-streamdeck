@@ -14,16 +14,16 @@ WIP. Pull requests more than welcome!
 
 Features:
 
-- [ ] Connecting to devices
+- [x] Connecting to devices
   - [x] Connecting by VID/PID/Serial
-  - [ ] Matching device _types_ (Mini etc.)
+  - [x] Matching device _types_ (Mini etc.)
 - [ ] Reading buttons
   - [x] Poll based mode (w/ blocking / non-blocking selection and timeouts)
   - [ ] Multi-threaded / async / callback driven mode
 - [x] Writing brightness
-- [ ] Setting buttons
+- [x] Setting buttons
   - [x] Writing colours
-  - [ ] Writing images (untested)
+  - [x] Writing images
 - [ ] Devices
   - [x] Stream Deck Mini
   - [x] Stream Deck Original (untested)
@@ -47,10 +47,10 @@ Building requires `libusb` and `hidapi` packages.
 
 ### Using the CLI
 
-`streamdeck-cli --help` displays available commands and options.
+`streamdeck-cli --help` displays available subcommands and options, passing `--help` to subcommands (ie. `streamdeck set-image --help`) displays options for that subcommand
 
 ```
-streamdeck-cli 0.1.0
+streamdeck-cli 0.4.1
 A CLI for the Elgato StreamDeck
 
 USAGE:
@@ -62,9 +62,9 @@ FLAGS:
 
 OPTIONS:
         --log-level <level>    Enable verbose logging [default: info]
-        --pid <pid>            USB Device Product ID (PID) in hex [default: 0063]
-        --serial <serial>      USB Device Serial
-        --vid <vid>            USB Device Vendor ID (VID) in hex [default: 0fd9]
+        --pid <pid>            USB Device Product ID (PID) in hex [env: USB_PID=]  [default: 0063]
+        --serial <serial>      USB Device Serial [env: USB_SERIAL=]
+        --vid <vid>            USB Device Vendor ID (VID) in hex [env: USB_VID=]  [default: 0fd9]
 
 SUBCOMMANDS:
     get-buttons       Fetch button states
@@ -72,7 +72,9 @@ SUBCOMMANDS:
     reset             Reset the attached device
     set-brightness    Set device display brightness
     set-colour        Set button colours
+    set-image         Set button images
     version           Fetch the device firmware version
+
 ```
 
 ## Related Works
