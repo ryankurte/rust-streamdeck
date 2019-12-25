@@ -55,6 +55,7 @@ pub enum Commands {
         #[structopt(flatten)]
         colour: Colour,
     },
+    /// Set button images
     SetImage {
         /// Index of button to be set
         key: u8,
