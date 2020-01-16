@@ -55,6 +55,13 @@ impl Kind {
         }
     }
 
+    pub fn image_mirror(&self) -> bool {
+        match self {
+            Kind::Original => true, //Original apparently needs the image mirrored
+            _ => false,             //Other kinds untested
+        }
+    }
+
     pub fn image_size_bytes(&self) -> usize {
         let (x, y) = self.image_size();
         x * y * 3

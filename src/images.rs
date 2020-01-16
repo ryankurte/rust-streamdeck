@@ -60,7 +60,7 @@ impl Default for ImageOptions {
 }
 
 /// Load an image from a file, resize to defined x and y, and apply the provided options
-pub fn load_image(path: &str, x: usize, y: usize, rotate: bool, opts: &ImageOptions) -> Result<Vec<u8>, Error> {
+pub fn load_image(path: &str, x: usize, y: usize, rotate: bool, mirror: bool, opts: &ImageOptions) -> Result<Vec<u8>, Error> {
 
     // Open image reader
     let reader = match Reader::open(path) {
@@ -99,6 +99,11 @@ pub fn load_image(path: &str, x: usize, y: usize, rotate: bool, opts: &ImageOpti
         image = image.rotate270();
     }
 
+    // Rotate image if requir
+    if mirror {
+        image = image.fliph();
+    }
+
     // Invert image if requir
     if opts.invert {
         image.invert();
@@ -121,7 +126,7 @@ mod test {
 
     #[test]
     fn load_images() {
-        let _image = load_image("./icons/power.png", 72, 72, true, &ImageOptions::default())
+        let _image = load_image("./icons/power.png", 72, 72, true, false, &ImageOptions::default())
             .expect("error loading image");
     }
 }

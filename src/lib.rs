@@ -224,8 +224,9 @@ impl StreamDeck {
     pub fn set_button_file(&mut self, key: u8, image: &str, opts: &ImageOptions) -> Result<(), Error> {
         let (x, y) = self.kind.image_size();
         let rotate = self.kind.image_rotation();
+        let mirror = self.kind.image_mirror();
 
-        let image = images::load_image(image, x, y, rotate, opts)?;
+        let image = images::load_image(image, x, y, rotate, mirror, opts)?;
 
         self.set_button_image(key, &image)?;
 
@@ -244,6 +245,11 @@ impl StreamDeck {
         // TODO: check / limit key value
         if key >= self.kind.keys() {
             return Err(Error::InvalidKeyIndex)
+        }
+
+        //Use alternative image upload implementation for Original device
+        if self.kind == Kind::Original {
+            return self.set_button_image_bmp_original(key + 1, image);
         }
 
         let mut sequence = 0;
@@ -299,6 +305,40 @@ impl StreamDeck {
             // Increase sequence counter
             sequence += 1;
         }
+
+        Ok(())
+    }
+
+    ///Set button image on Original device
+    /// * `key` - Keys are 1-indexed.
+    fn set_button_image_bmp_original(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
+        //Based on Cliff Rowleys Stream Deck Protocol notes https://gist.github.com/cliffrowley/d18a9c4569537b195f2b1eb6c68469e0#0x02-set-key-image
+        //According to Rowleys notes index of key being set is zero based, but in actuality it seems to be one based.
+
+        let mut buff = vec![0u8; 8191]; //Each packet is a total of 8191 bytes.
+
+        //First packet
+        let previous_packet: u8 = 0;
+        let packet: u8 = 1;
+        buff[..16].copy_from_slice(&[0x02, 0x01, packet, 0x00, previous_packet, key, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,]); //Header
+        buff[16..70].copy_from_slice(&[ //Extra //Purpose unknown
+            0x42, 0x4d, 0xf6, 0x3c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00, 0x28, 0x00,
+            0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xc0, 0x3c, 0x00, 0x00, 0x13, 0x0e, 0x00, 0x00, 0x13, 0x0e, 0x00, 0x00, 0x00, 0x00, //From Cliff Rowleys notes
+        //  0x00, 0x00, 0xc0, 0x3c, 0x00, 0x00, 0xc4, 0x0e, 0x00, 0x00, 0xc4, 0x0e, 0x00, 0x00, 0x00, 0x00, //From Ryan Kurtes code // 7th and 11th bytes on the line differ. I can't tell any difference in behaviour.
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]);
+        buff[70..7819].copy_from_slice(&image[0..7749]); //Image data //First 7749 bytes (2583 pixels)
+        //for i in 7819..8191 { buff[i] = 0x00; } //Padding //I don't think padding needs to be zeroed
+        self.device.write(&buff)?; //Send packet
+
+        //Second packet
+        let previous_packet = packet;
+        let packet = packet + 1;
+        buff[..16].copy_from_slice(&[0x02, 0x01, packet, 0x00, previous_packet, key, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,]); //Header
+        buff[16..7819].copy_from_slice(&image[7749..15552]); //Image data //Remaining 7803 bytes (2601 pixels) //Total image data should add up to 15552 bytes (5184 pixels)
+        //for i in 7819..8191 { buff[i] = 0x00; } //Padding //I don't think padding needs to be zeroed
+        self.device.write(&buff)?; //Send packet
 
         Ok(())
     }
