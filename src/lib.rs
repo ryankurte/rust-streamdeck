@@ -221,6 +221,7 @@ impl StreamDeck {
         }
     }
 
+    ///  Set a button to the provided image file
     pub fn set_button_file(&mut self, key: u8, image: &str, opts: &ImageOptions) -> Result<(), Error> {
         let (x, y) = self.kind.image_size();
         let rotate = self.kind.image_rotation();
@@ -235,7 +236,6 @@ impl StreamDeck {
 
     /// Internal function to set images for bitmap based devices
     fn set_button_image_bmp(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
-        let mut buff = vec![0u8; self.kind.image_report_len() ];
 
         // Check image dimensions
         if image.len() != self.kind.image_size_bytes() {
@@ -247,10 +247,19 @@ impl StreamDeck {
             return Err(Error::InvalidKeyIndex)
         }
 
-        //Use alternative image upload implementation for Original device
-        if self.kind == Kind::Original {
-            return self.set_button_image_bmp_original(key + 1, image);
+        // Use device specific image upload function
+        match self.kind {
+            Kind::Original => self.set_button_image_bmp_original(key + 1, image)?,
+            Kind::Mini => self.set_button_image_bmp_mini(key, image)?,
+            _ => unimplemented!(),
         }
+
+        Ok(())
+    }
+
+    /// Set button image on Mini device
+    fn set_button_image_bmp_mini(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
+        let mut buff = vec![0u8; self.kind.image_report_len() ];
 
         let mut sequence = 0;
         let mut offset = 0;
@@ -309,11 +318,11 @@ impl StreamDeck {
         Ok(())
     }
 
-    ///Set button image on Original device
+    /// Set button image on Original device
     /// * `key` - Keys are 1-indexed.
     fn set_button_image_bmp_original(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
-        //Based on Cliff Rowleys Stream Deck Protocol notes https://gist.github.com/cliffrowley/d18a9c4569537b195f2b1eb6c68469e0#0x02-set-key-image
-        //According to Rowleys notes index of key being set is zero based, but in actuality it seems to be one based.
+        // Based on Cliff Rowleys Stream Deck Protocol notes https://gist.github.com/cliffrowley/d18a9c4569537b195f2b1eb6c68469e0#0x02-set-key-image
+        // According to Rowleys notes index of key being set is zero based, but in actuality it seems to be one based.
 
         let mut buff = vec![0u8; 8191]; //Each packet is a total of 8191 bytes.
 
@@ -341,14 +350,5 @@ impl StreamDeck {
         self.device.write(&buff)?; //Send packet
 
         Ok(())
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }
