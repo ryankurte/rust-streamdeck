@@ -7,6 +7,13 @@ pub enum Kind {
     Xl,
 }
 
+/// Stream Deck key layout direction
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum KeyDirection {
+    LeftToRight,
+    RightToLeft,
+}
+
 /// Stream Deck Image Modes
 #[derive(Debug, Clone, PartialEq)]
 pub enum ImageMode {
@@ -53,6 +60,31 @@ impl Kind {
             Kind::Original | Kind::OriginalV2 => 15,
             Kind::Mini => 8,
             Kind::Xl => 32,
+        }
+    }
+
+    // Offset for the first key in button report
+    pub(crate) fn key_data_offset(&self) -> usize {
+        match self {
+            Kind::Original => 0,
+            Kind::OriginalV2 => 3,
+            Kind::Mini => 0,
+            Kind::Xl => 3,
+        }
+    }
+
+    pub(crate) fn key_direction(&self) -> KeyDirection {
+        match self {
+            Kind::Original => KeyDirection::RightToLeft,
+            _ => KeyDirection::LeftToRight,
+        }
+    }
+
+    pub(crate) fn key_columns(&self) -> u8 {
+        match self {
+            Kind::Mini => 3,
+            Kind::Original | Kind::OriginalV2 => 5,
+            Kind::Xl => 8,
         }
     }
 

@@ -195,18 +195,36 @@ impl StreamDeck {
     /// (or the specified timeout has elapsed). In non-blocking mode this will return
     /// immediately with a zero vector if no data is available
     pub fn read_buttons(&mut self, timeout: Option<Duration>) -> Result<Vec<u8>, Error> {
-        let mut cmd = [0u8; 17];
+        let mut cmd = [0u8; 36];
+        let keys = self.kind.keys() as usize;
+        let offset = self.kind.key_data_offset();
 
         match timeout {
-            Some(t) => self.device.read_timeout(&mut cmd, t.as_millis() as i32)?,
-            None => self.device.read(&mut cmd)?,
+            Some(t) => self
+                .device
+                .read_timeout(&mut cmd[..keys + offset + 1], t.as_millis() as i32)?,
+            None => self.device.read(&mut cmd[..keys + offset + 1])?,
         };
 
         if cmd[0] == 0 {
             return Err(Error::NoData);
         }
 
-        Ok((&cmd[1..]).to_vec())
+        let mut out = vec![0u8; keys];
+        match self.kind.key_direction() {
+            KeyDirection::RightToLeft => {
+                for (i, val) in out.iter_mut().enumerate() {
+                    // In right-to-left mode(original Streamdeck) the first key has index 1,
+                    // so we don't add the +1 here.
+                    *val = cmd[offset + self.translate_key_index(i as u8)? as usize];
+                }
+            }
+            KeyDirection::LeftToRight => {
+                out[0..keys].copy_from_slice(&cmd[1 + offset..1 + offset + keys]);
+            }
+        }
+
+        Ok(out)
     }
 
     /// Fetch image size for the connected device
@@ -284,14 +302,15 @@ impl StreamDeck {
         if key >= self.kind.keys() {
             return Err(Error::InvalidKeyIndex);
         }
-        let mapped = match self.kind {
+        let mapped = match self.kind.key_direction() {
             // All but the original Streamdeck already have correct coordinates
-            Kind::Xl | Kind::OriginalV2 | Kind::Mini => key,
+            KeyDirection::LeftToRight => key,
             // The original Streamdeck uses 1-indexed right-to-left
-            Kind::Original => {
-                let col = key % 5;
-                let row = key / 5;
-                row * 5 + 5 - col
+            KeyDirection::RightToLeft => {
+                let cols = self.kind.key_columns() as u8;
+                let col = key % cols;
+                let row = key / cols;
+                row * cols + cols - col
             }
         };
         Ok(mapped)
