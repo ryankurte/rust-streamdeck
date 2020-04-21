@@ -21,13 +21,14 @@ pub enum ImageMode {
     Jpeg,
 }
 
-/// Stream Deck Image Modes
+/// Stream Deck color mode
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ColourOrder {
     RGB,
     BGR,
 }
 
+/// Rotation to apply to an image
 #[derive(Debug, Clone, PartialEq)]
 pub enum Rotation {
     Rot0,
@@ -36,6 +37,7 @@ pub enum Rotation {
     Rot270,
 }
 
+/// Mirroring to apply to an image
 #[derive(Debug, Clone, PartialEq)]
 pub enum Mirroring {
     None,
