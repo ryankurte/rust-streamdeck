@@ -27,8 +27,8 @@ Features:
 - [ ] Devices
   - [x] Stream Deck Mini
   - [x] Stream Deck Original (untested)
-  - [ ] Stream Deck Original V2
-  - [ ] Stream Deck XL
+  - [x] Stream Deck Original V2
+  - [x] Stream Deck XL
 
 
 ## Getting started
@@ -90,3 +90,4 @@ You might also like to look at:
 - [node-elgato-stream-deck](https://github.com/Lange/node-elgato-stream-deck/blob/master/NOTES.md)
 
 [Icons](icons/) from [material.io](https://material.io) and [brandeps.com](https://www.brandeps.com)
+
