@@ -1,6 +1,6 @@
-
+use std::borrow::Cow;
+use std::io::Error as IoError;
 use std::time::Duration;
-use std::io::{Error as IoError};
 
 #[macro_use]
 extern crate log;
@@ -9,9 +9,10 @@ extern crate hidapi;
 use hidapi::{HidApi, HidDevice, HidError};
 
 extern crate image;
-use image::ImageError;
+use image::{DynamicImage, ImageError};
 
 pub mod images;
+use crate::images::{apply_transform, encode_jpeg};
 pub use crate::images::{Colour, ImageOptions};
 
 pub mod info;
@@ -20,11 +21,11 @@ pub use info::*;
 /// StreamDeck object
 pub struct StreamDeck {
     kind: Kind,
-    device: HidDevice
+    device: HidDevice,
 }
 
 /// Helper object for filtering device connections
-#[cfg(feature = "structopt" )]
+#[cfg(feature = "structopt")]
 #[derive(structopt::StructOpt)]
 pub struct Filter {
     #[structopt(long, default_value="0fd9", parse(try_from_str=u16_parse_hex), env="USB_VID")]
@@ -35,7 +36,7 @@ pub struct Filter {
     /// USB Device Product ID (PID) in hex
     pub pid: u16,
 
-    #[structopt(long, env="USB_SERIAL")]
+    #[structopt(long, env = "USB_SERIAL")]
     /// USB Device Serial
     pub serial: Option<String>,
 }
@@ -62,12 +63,24 @@ impl From<HidError> for Error {
     }
 }
 
+impl From<IoError> for Error {
+    fn from(e: IoError) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl From<ImageError> for Error {
+    fn from(e: ImageError) -> Self {
+        Self::Image(e)
+    }
+}
+
 /// Device USB Product Identifiers (PIDs)
 pub mod pids {
-    pub const ORIGINAL:     u16 = 0x0060;
-    pub const ORIGINAL_V2:  u16 = 0x006d;
-    pub const MINI:         u16 = 0x0063;
-    pub const XL:           u16 = 0x006c;
+    pub const ORIGINAL: u16 = 0x0060;
+    pub const ORIGINAL_V2: u16 = 0x006d;
+    pub const MINI: u16 = 0x0063;
+    pub const XL: u16 = 0x006c;
 }
 
 impl StreamDeck {
@@ -81,9 +94,9 @@ impl StreamDeck {
             pids::ORIGINAL => Kind::Original,
             pids::MINI => Kind::Mini,
 
-            pids::ORIGINAL_V2 => unimplemented!(),
-            pids::XL => unimplemented!(),
-            
+            pids::ORIGINAL_V2 => Kind::OriginalV2,
+            pids::XL => Kind::Xl,
+
             _ => return Err(Error::UnrecognisedPID),
         };
 
@@ -96,11 +109,11 @@ impl StreamDeck {
         }?;
 
         // Return streamdeck object
-        Ok(StreamDeck{device, kind})
+        Ok(StreamDeck { device, kind })
     }
 
     /// Fetch the connected device kind
-    /// 
+    ///
     /// This can be used to retrieve related device information such as
     /// images sizes and modes
     pub fn kind(&self) -> Kind {
@@ -128,7 +141,7 @@ impl StreamDeck {
     /// Fetch the device firmware version
     pub fn version(&mut self) -> Result<String, Error> {
         let mut buff = [0u8; 17];
-        buff[0] = 0x04;
+        buff[0] = if self.kind.is_v2() { 0x05 } else { 0x04 };
 
         let _s = self.device.get_feature_report(&mut buff)?;
 
@@ -138,8 +151,12 @@ impl StreamDeck {
     /// Reset the connected device
     pub fn reset(&mut self) -> Result<(), Error> {
         let mut cmd = [0u8; 17];
-        
-        cmd[..2].copy_from_slice(&[0x0b, 0x63]);
+
+        if self.kind.is_v2() {
+            cmd[..2].copy_from_slice(&[0x03, 0x02]);
+        } else {
+            cmd[..2].copy_from_slice(&[0x0b, 0x63]);
+        }
 
         self.device.send_feature_report(&cmd)?;
 
@@ -152,7 +169,11 @@ impl StreamDeck {
 
         let brightness = brightness.min(100);
 
-        cmd[..6].copy_from_slice(&[0x05, 0x55, 0xaa, 0xd1, 0x01, brightness]);
+        if self.kind.is_v2() {
+            cmd[..3].copy_from_slice(&[0x03, 0x08, brightness]);
+        } else {
+            cmd[..6].copy_from_slice(&[0x05, 0x55, 0xaa, 0xd1, 0x01, brightness]);
+        }
 
         self.device.send_feature_report(&cmd)?;
 
@@ -160,7 +181,7 @@ impl StreamDeck {
     }
 
     /// Set blocking mode
-    /// 
+    ///
     /// See: `read_buttons` for discussion of this functionality
     pub fn set_blocking(&mut self, blocking: bool) -> Result<(), Error> {
         self.device.set_blocking_mode(blocking)?;
@@ -169,23 +190,41 @@ impl StreamDeck {
     }
 
     /// Fetch button states
-    /// 
+    ///
     /// In blocking mode this will wait until a report packet has been received
     /// (or the specified timeout has elapsed). In non-blocking mode this will return
     /// immediately with a zero vector if no data is available
     pub fn read_buttons(&mut self, timeout: Option<Duration>) -> Result<Vec<u8>, Error> {
-        let mut cmd = [0u8; 17];
+        let mut cmd = [0u8; 36];
+        let keys = self.kind.keys() as usize;
+        let offset = self.kind.key_data_offset();
 
         match timeout {
-            Some(t) => self.device.read_timeout(&mut cmd, t.as_millis() as i32)?,
-            None => self.device.read(&mut cmd)?,
+            Some(t) => self
+                .device
+                .read_timeout(&mut cmd[..keys + offset + 1], t.as_millis() as i32)?,
+            None => self.device.read(&mut cmd[..keys + offset + 1])?,
         };
 
         if cmd[0] == 0 {
-            return Err(Error::NoData)
+            return Err(Error::NoData);
         }
 
-        Ok((&cmd[1..]).to_vec())
+        let mut out = vec![0u8; keys];
+        match self.kind.key_direction() {
+            KeyDirection::RightToLeft => {
+                for (i, val) in out.iter_mut().enumerate() {
+                    // In right-to-left mode(original Streamdeck) the first key has index 1,
+                    // so we don't add the +1 here.
+                    *val = cmd[offset + self.translate_key_index(i as u8)? as usize];
+                }
+            }
+            KeyDirection::LeftToRight => {
+                out[0..keys].copy_from_slice(&cmd[1 + offset..1 + offset + keys]);
+            }
+        }
+
+        Ok(out)
     }
 
     /// Fetch image size for the connected device
@@ -195,160 +234,190 @@ impl StreamDeck {
 
     /// Set a button to the provided RGB colour
     pub fn set_button_rgb(&mut self, key: u8, colour: &Colour) -> Result<(), Error> {
-        let mut image = vec![0u8; self.kind.image_size_bytes() ];
+        let mut image = vec![0u8; self.kind.image_size_bytes()];
+        let colour_order = self.kind.image_colour_order();
 
         for i in 0..image.len() {
             match i % 3 {
-                0 => image[i] = colour.b,
+                0 => {
+                    image[i] = match colour_order {
+                        ColourOrder::BGR => colour.b,
+                        ColourOrder::RGB => colour.r,
+                    }
+                }
                 1 => image[i] = colour.g,
-                2 => image[i] = colour.r,
+                2 => {
+                    image[i] = match colour_order {
+                        ColourOrder::BGR => colour.r,
+                        ColourOrder::RGB => colour.b,
+                    }
+                }
                 _ => unreachable!(),
             };
         }
 
-        self.set_button_image(key, &image)?;
+        self.write_button_image(key, &image)?;
 
         Ok(())
     }
 
     /// Set a button to the provided image
-    /// 
-    /// Images in BGR format, `IMAGE_X` by `IMAGE_Y` at 3 bytes per pixel
-    pub fn set_button_image(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
-        match self.kind.image_mode() {
-            ImageMode::Bmp => self.set_button_image_bmp(key, image),
-            ImageMode::Jpeg => unimplemented!(),
-        }
+    pub fn set_button_image(&mut self, key: u8, image: DynamicImage) -> Result<(), Error> {
+        let image = apply_transform(image, self.kind.image_rotation(), self.kind.image_mirror());
+        let image = match self.kind.image_colour_order() {
+            ColourOrder::BGR => image.into_bgr().into_vec(),
+            ColourOrder::RGB => image.into_rgb().into_vec(),
+        };
+        self.write_button_image(key, &image)
     }
 
     ///  Set a button to the provided image file
-    pub fn set_button_file(&mut self, key: u8, image: &str, opts: &ImageOptions) -> Result<(), Error> {
+    pub fn set_button_file(
+        &mut self,
+        key: u8,
+        image: &str,
+        opts: &ImageOptions,
+    ) -> Result<(), Error> {
         let (x, y) = self.kind.image_size();
         let rotate = self.kind.image_rotation();
         let mirror = self.kind.image_mirror();
 
-        let image = images::load_image(image, x, y, rotate, mirror, opts)?;
+        let image = images::load_image(
+            image,
+            x,
+            y,
+            rotate,
+            mirror,
+            opts,
+            self.kind.image_colour_order(),
+        )?;
 
-        self.set_button_image(key, &image)?;
+        self.write_button_image(key, &image)?;
 
         Ok(())
     }
 
-    /// Internal function to set images for bitmap based devices
-    fn set_button_image_bmp(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
+    /// Transforms a key from zero-indexed left-to-right into the device-correct coordinate system
+    fn translate_key_index(&self, key: u8) -> Result<u8, Error> {
+        if key >= self.kind.keys() {
+            return Err(Error::InvalidKeyIndex);
+        }
+        let mapped = match self.kind.key_direction() {
+            // All but the original Streamdeck already have correct coordinates
+            KeyDirection::LeftToRight => key,
+            // The original Streamdeck uses 1-indexed right-to-left
+            KeyDirection::RightToLeft => {
+                let cols = self.kind.key_columns() as u8;
+                let col = key % cols;
+                let row = key / cols;
+                row * cols + cols - col
+            }
+        };
+        Ok(mapped)
+    }
 
+    /// Writes an image to a button
+    /// Image at this point in correct dimensions and in device native colour order.
+    fn write_button_image(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
         // Check image dimensions
         if image.len() != self.kind.image_size_bytes() {
-            return Err(Error::InvalidImageSize)
+            return Err(Error::InvalidImageSize);
         }
 
-        // TODO: check / limit key value
-        if key >= self.kind.keys() {
-            return Err(Error::InvalidKeyIndex)
-        }
+        let key = self.translate_key_index(key)?;
 
-        // Use device specific image upload function
+        let image = match self.kind.image_mode() {
+            ImageMode::Bmp => Cow::from(image),
+            ImageMode::Jpeg => {
+                let (w, h) = self.kind.image_size();
+                Cow::from(encode_jpeg(image, w, h)?)
+            }
+        };
+
+        let mut buf = vec![0u8; self.kind.image_report_len()];
+        let base = self.kind.image_base();
+        let hdrlen = self.kind.image_report_header_len();
+
         match self.kind {
-            Kind::Original => self.set_button_image_bmp_original(key + 1, image)?,
-            Kind::Mini => self.set_button_image_bmp_mini(key, image)?,
-            _ => unimplemented!(),
-        }
+            Kind::Original => {
+                // Original Streamdeck uses static lengths, not the dynamically sized protocol on the
+                // later versions. First packet contains the initial 7749 bytes.
+                self.write_image_header(&mut buf, key, 1, false, 0);
+                let start = hdrlen + base.len();
+                buf[hdrlen..start].copy_from_slice(base);
+                buf[start..start + 7749].copy_from_slice(&image[0..7749]);
+                self.device.write(&buf)?;
 
-        Ok(())
-    }
+                // Second packet contains the last 7803 bytes
+                self.write_image_header(&mut buf, key, 2, true, 0);
+                buf[hdrlen..hdrlen + 7803].copy_from_slice(&image[7749..15552]);
+                self.device.write(&buf)?;
 
-    /// Set button image on Mini device
-    fn set_button_image_bmp_mini(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
-        let mut buff = vec![0u8; self.kind.image_report_len() ];
-
-        let mut sequence = 0;
-        let mut offset = 0;
-        
-        while offset < image.len() {
-            
-            let mut index = 0;
-
-            let overhead = match sequence {
-                0 => 16 + 54,
-                _ => 16,
-            };
-
-            // Calculate chunk size
-            let max_chunk_size = self.kind.image_report_len() - overhead;
-            let chunk_size = (image.len() - offset).min(max_chunk_size);
-
-            trace!("sequence: {}, offset: {}, chunk_size: {}, buff_size: {}", sequence, offset, chunk_size, self.kind.image_report_len());
-
-            // Build header
-            let next = match chunk_size == (image.len() - offset) {
-                true => 1,
-                false => 0,
-            };
-
-            buff[..6].copy_from_slice(&[0x02, 0x01, sequence, 0x00, next, key + 1]);
-            index += 16;
-
-            // Add extra image header info to first message
-            if sequence == 0 {
-                let base = self.kind.image_base();
-                buff[index..index+base.len()].copy_from_slice(&base);
-                index += base.len();
+                Ok(())
             }
 
-            // Copy image chunk
-            buff[index..index+chunk_size].copy_from_slice(&image[offset..offset+chunk_size]);
-            offset += chunk_size;
-            index += chunk_size;
+            _ => {
+                let mut sequence = 0;
+                let mut offset = 0;
+                let maxdatalen = buf.len() - hdrlen;
 
-            // Zero out remaining message data
-            for i in &mut buff[index..] {
-                *i = 0;
+                while offset < image.len() {
+                    let mut take = (image.len() - offset).min(maxdatalen);
+                    let mut start = hdrlen;
+
+                    if sequence == 0 && !base.is_empty() {
+                        trace!("outputting base");
+                        buf[start..start + base.len()].copy_from_slice(base);
+                        // Recalculate take with the smaller room
+                        take = (image.len() - offset).min(maxdatalen - base.len());
+                        start += base.len();
+                    }
+
+                    let is_last = take == image.len() - offset;
+                    self.write_image_header(&mut buf, key, sequence, is_last, take);
+                    buf[start..start + take].copy_from_slice(&image[offset..offset + take]);
+
+                    trace!(
+                        "outputting image chunk [{}..{}[ in [{}..{}[, sequence {}{}",
+                        offset,
+                        offset + take,
+                        start,
+                        start + take,
+                        sequence,
+                        if is_last { " (last)" } else { "" },
+                    );
+                    self.device.write(&buf)?;
+
+                    sequence += 1;
+                    offset += take;
+                }
+                Ok(())
             }
-
-            trace!("Writing chunk");
-            trace!("Header: {:x?}", &buff[..16]);
-            trace!("Buffer: {:x?}", &buff[..]);
-
-            self.device.write(&buff)?;
-
-            // Increase sequence counter
-            sequence += 1;
         }
-
-        Ok(())
     }
 
-    /// Set button image on Original device
-    /// * `key` - Keys are 1-indexed.
-    fn set_button_image_bmp_original(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
-        // Based on Cliff Rowleys Stream Deck Protocol notes https://gist.github.com/cliffrowley/d18a9c4569537b195f2b1eb6c68469e0#0x02-set-key-image
-        // According to Rowleys notes index of key being set is zero based, but in actuality it seems to be one based.
-
-        let mut buff = vec![0u8; 8191]; //Each packet is a total of 8191 bytes.
-
-        //First packet
-        let previous_packet: u8 = 0;
-        let packet: u8 = 1;
-        buff[..16].copy_from_slice(&[0x02, 0x01, packet, 0x00, previous_packet, key, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,]); //Header
-        buff[16..70].copy_from_slice(&[ //Extra //Purpose unknown
-            0x42, 0x4d, 0xf6, 0x3c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x36, 0x00, 0x00, 0x00, 0x28, 0x00,
-            0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0xc0, 0x3c, 0x00, 0x00, 0x13, 0x0e, 0x00, 0x00, 0x13, 0x0e, 0x00, 0x00, 0x00, 0x00, //From Cliff Rowleys notes
-        //  0x00, 0x00, 0xc0, 0x3c, 0x00, 0x00, 0xc4, 0x0e, 0x00, 0x00, 0xc4, 0x0e, 0x00, 0x00, 0x00, 0x00, //From Ryan Kurtes code // 7th and 11th bytes on the line differ. I can't tell any difference in behaviour.
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ]);
-        buff[70..7819].copy_from_slice(&image[0..7749]); //Image data //First 7749 bytes (2583 pixels)
-        //for i in 7819..8191 { buff[i] = 0x00; } //Padding //I don't think padding needs to be zeroed
-        self.device.write(&buff)?; //Send packet
-
-        //Second packet
-        let previous_packet = packet;
-        let packet = packet + 1;
-        buff[..16].copy_from_slice(&[0x02, 0x01, packet, 0x00, previous_packet, key, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,]); //Header
-        buff[16..7819].copy_from_slice(&image[7749..15552]); //Image data //Remaining 7803 bytes (2601 pixels) //Total image data should add up to 15552 bytes (5184 pixels)
-        //for i in 7819..8191 { buff[i] = 0x00; } //Padding //I don't think padding needs to be zeroed
-        self.device.write(&buff)?; //Send packet
-
-        Ok(())
+    /// Writes the image report header to the given buffer
+    fn write_image_header(
+        &self,
+        buf: &mut [u8],
+        key: u8,
+        sequence: u16,
+        is_last: bool,
+        payload_len: usize,
+    ) {
+        if self.kind.is_v2() {
+            buf[0] = 0x02;
+            buf[1] = 0x07;
+            buf[2] = key;
+            buf[3] = if is_last { 1 } else { 0 };
+            buf[4..6].copy_from_slice(&(payload_len as u16).to_le_bytes());
+            buf[6..8].copy_from_slice(&sequence.to_le_bytes());
+        } else {
+            buf[0] = 0x02;
+            buf[1] = 0x01;
+            buf[2..4].copy_from_slice(&sequence.to_le_bytes());
+            buf[4] = if is_last { 1 } else { 0 };
+            buf[5] = key;
+        }
     }
 }
