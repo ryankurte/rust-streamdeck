@@ -373,7 +373,7 @@ impl StreamDeck {
                         start += base.len();
                     }
 
-                    let is_last = take < maxdatalen;
+                    let is_last = take == image.len() - offset;
                     self.write_image_header(&mut buf, key, sequence, is_last, take);
                     buf[start..start + take].copy_from_slice(&image[offset..offset + take]);
 
