@@ -146,6 +146,7 @@ impl Kind {
 
     pub fn image_base(&self) -> &[u8] {
         match self {
+            // BMP headers for the original and mini
             Kind::Original => &ORIGINAL_IMAGE_BASE,
             Kind::Mini => &MINI_IMAGE_BASE,
 
