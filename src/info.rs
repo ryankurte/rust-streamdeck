@@ -46,16 +46,6 @@ pub enum Mirroring {
     Both,
 }
 
-const ORIGINAL_IMAGE_REPORT_LEN: usize = 8191;
-const MINI_IMAGE_REPORT_LEN: usize = 1024;
-const ORIGINAL_V2_IMAGE_REPORT_LEN: usize = 1024;
-const XL_IMAGE_REPORT_LEN: usize = 1024;
-
-const ORIGINAL_IMAGE_REPORT_HEADER_LEN: usize = 16;
-const MINI_IMAGE_REPORT_HEADER_LEN: usize = 16;
-const ORIGINAL_V2_IMAGE_REPORT_HEADER_LEN: usize = 8;
-const XL_IMAGE_REPORT_HEADER_LEN: usize = 8;
-
 impl Kind {
     pub fn keys(&self) -> u8 {
         match self {
@@ -130,19 +120,15 @@ impl Kind {
 
     pub(crate) fn image_report_len(&self) -> usize {
         match self {
-            Kind::Original => ORIGINAL_IMAGE_REPORT_LEN,
-            Kind::Mini => MINI_IMAGE_REPORT_LEN,
-            Kind::OriginalV2 => ORIGINAL_V2_IMAGE_REPORT_LEN,
-            Kind::Xl => XL_IMAGE_REPORT_LEN,
+            Kind::Original => 8191,
+            _ => 1024,
         }
     }
 
     pub(crate) fn image_report_header_len(&self) -> usize {
         match self {
-            Kind::Original => ORIGINAL_IMAGE_REPORT_HEADER_LEN,
-            Kind::Mini => MINI_IMAGE_REPORT_HEADER_LEN,
-            Kind::OriginalV2 => ORIGINAL_V2_IMAGE_REPORT_HEADER_LEN,
-            Kind::Xl => XL_IMAGE_REPORT_HEADER_LEN,
+            Kind::Original | Kind::Mini => 16,
+            Kind::OriginalV2 | Kind::Xl => 8,
         }
     }
 
