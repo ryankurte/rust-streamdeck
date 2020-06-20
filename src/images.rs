@@ -56,6 +56,12 @@ pub struct ImageOptions {
     invert: bool,
 }
 
+impl ImageOptions {
+    pub fn new(background: Option<Colour>, invert: bool) -> Self {
+        ImageOptions { background, invert }
+    }
+}
+
 impl Default for ImageOptions {
     fn default() -> Self {
         Self {
