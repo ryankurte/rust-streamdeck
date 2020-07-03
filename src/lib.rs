@@ -9,7 +9,7 @@ extern crate hidapi;
 use hidapi::{HidApi, HidDevice, HidError};
 
 extern crate image;
-use image::{DynamicImage, ImageError};
+use image::{DynamicImage, ImageBuffer, ImageError, Rgb};
 
 pub mod images;
 use crate::images::{apply_transform, encode_jpeg};
@@ -17,6 +17,9 @@ pub use crate::images::{Colour, ImageOptions};
 
 pub mod info;
 pub use info::*;
+
+use imageproc::drawing::draw_text_mut;
+use rusttype::{Font, Scale};
 
 /// StreamDeck object
 pub struct StreamDeck {
@@ -270,6 +273,33 @@ impl StreamDeck {
             ColourOrder::RGB => image.into_rgb().into_vec(),
         };
         self.write_button_image(key, &image)
+    }
+
+    /// Sets a button to the provided text.
+    /// Will break text over \n linebreaks
+    pub fn set_button_text(
+        &mut self,
+        key: u8,
+        colour: &Colour,
+        background: &Colour,
+        x: u32,
+        y: u32,
+        scale: Scale,
+        line_height: f32,
+        font: &Font,
+        text: &str,
+    ) -> Result<(), Error> {
+        let (width, height) = self.kind.image_size();
+        let background = Rgb([background.r, background.g, background.b]);
+        let colour = Rgb([colour.r, colour.g, colour.b]);
+        let mut image = ImageBuffer::from_pixel(width as u32, height as u32, background);
+        let mut y = y;
+        text.to_string().split("\n").for_each(|txt| {
+            draw_text_mut(&mut image, colour, x, y, scale, font, txt);
+            y += (scale.y * line_height).round() as u32;
+        });
+
+        self.set_button_image(key, DynamicImage::ImageRgb8(image))
     }
 
     ///  Set a button to the provided image file
