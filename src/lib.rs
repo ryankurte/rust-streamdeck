@@ -9,7 +9,7 @@ extern crate hidapi;
 use hidapi::{HidApi, HidDevice, HidError};
 
 extern crate image;
-use image::{DynamicImage, ImageError};
+use image::{DynamicImage, ImageBuffer, ImageError, Rgb};
 
 pub mod images;
 use crate::images::{apply_transform, encode_jpeg};
@@ -17,6 +17,10 @@ pub use crate::images::{Colour, ImageOptions};
 
 pub mod info;
 pub use info::*;
+
+use imageproc::drawing::draw_text_mut;
+use rusttype::{Font, Scale};
+use std::str::FromStr;
 
 /// StreamDeck object
 pub struct StreamDeck {
@@ -272,6 +276,34 @@ impl StreamDeck {
         self.write_button_image(key, &image)
     }
 
+    /// Sets a button to the provided text.
+    /// Will break text over \n linebreaks
+    pub fn set_button_text(
+        &mut self,
+        key: u8,
+        font: &Font,
+        pos: &TextPosition,
+        text: &str,
+        opts: &TextOptions,
+    ) -> Result<(), Error> {
+        let (width, height) = self.kind.image_size();
+        let background = Rgb([opts.background.r, opts.background.g, opts.background.b]);
+        let colour = Rgb([opts.foreground.r, opts.foreground.g, opts.foreground.b]);
+        let mut image = ImageBuffer::from_pixel(width as u32, height as u32, background);
+
+        match pos {
+            TextPosition::Absolute { x, y } => {
+                let mut y = *y;
+                text.to_string().split("\n").for_each(|txt| {
+                    draw_text_mut(&mut image, colour, *x, y, opts.scale, font, txt);
+                    y += (opts.scale.y * opts.line_height).round() as u32;
+                });
+            }
+        }
+
+        self.set_button_image(key, DynamicImage::ImageRgb8(image))
+    }
+
     ///  Set a button to the provided image file
     pub fn set_button_file(
         &mut self,
@@ -419,6 +451,44 @@ impl StreamDeck {
             buf[2..4].copy_from_slice(&sequence.to_le_bytes());
             buf[4] = if is_last { 1 } else { 0 };
             buf[5] = key;
+        }
+    }
+}
+
+/// TextPosition is how to position text via set_button_text
+pub enum TextPosition {
+    /// Absolute positioning
+    Absolute { x: u32, y: u32 },
+}
+
+/// Text Options provide values for text buttons
+pub struct TextOptions {
+    foreground: Colour,
+    background: Colour,
+    scale: Scale,
+    line_height: f32,
+}
+
+impl TextOptions {
+    pub fn new(foreground: Colour, background: Colour, scale: Scale, line_height: f32) -> Self {
+        TextOptions {
+            foreground,
+            background,
+            scale,
+            line_height,
+        }
+    }
+}
+
+impl Default for TextOptions {
+    /// default is white text on a black background, with 15 pixel high text
+    /// and 1.1x the line height.
+    fn default() -> Self {
+        TextOptions {
+            foreground: Colour::from_str("FFFFFF").unwrap(),
+            background: Colour::from_str("000000").unwrap(),
+            scale: Scale { x: 15.0, y: 15.0 },
+            line_height: 1.1,
         }
     }
 }

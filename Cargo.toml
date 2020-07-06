@@ -16,6 +16,8 @@ default = [ "util" ]
 hidapi = "1.2"
 log = "0.4.8"
 image = "0.23.3"
+imageproc = "0.20.0"
+rusttype = "0.8.3"
 
 structopt = { version = "0.3.5", optional = true }
 simplelog = { version = "0.7.4", optional = true }
