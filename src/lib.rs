@@ -92,7 +92,16 @@ impl StreamDeck {
     pub fn connect(vid: u16, pid: u16, serial: Option<String>) -> Result<StreamDeck, Error> {
         // Create new API
         let api = HidApi::new()?;
+        StreamDeck::connect_with_hid(&api, vid, pid, serial)
+    }
 
+    /// Connect to a streamdeck device with an already initialise HidApi instance
+    pub fn connect_with_hid(
+        api: &HidApi,
+        vid: u16,
+        pid: u16,
+        serial: Option<String>,
+    ) -> Result<StreamDeck, Error> {
         // Match info based on PID
         let kind = match pid {
             pids::ORIGINAL => Kind::Original,
