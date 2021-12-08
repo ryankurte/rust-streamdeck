@@ -20,7 +20,10 @@ pub use info::*;
 
 use imageproc::drawing::draw_text_mut;
 use rusttype::{Font, Scale};
-use std::str::FromStr;
+use std::{
+    fmt::{self, Display},
+    str::FromStr,
+};
 
 /// StreamDeck object
 pub struct StreamDeck {
@@ -60,6 +63,24 @@ pub enum Error {
     UnrecognisedPID,
     NoData,
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Error::*;
+
+        match self {
+            Hid(err) => err.fmt(f),
+            Io(err) => err.fmt(f),
+            Image(err) => err.fmt(f),
+            InvalidImageSize => write!(f, "invalid image size"),
+            InvalidKeyIndex => write!(f, "invalid key index"),
+            UnrecognisedPID => write!(f, "unrecognised pid"),
+            NoData => write!(f, "no data"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 impl From<HidError> for Error {
     fn from(e: HidError) -> Self {
