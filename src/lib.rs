@@ -20,10 +20,8 @@ pub use info::*;
 
 use imageproc::drawing::draw_text_mut;
 use rusttype::{Font, Scale};
-use std::{
-    fmt::{self, Display},
-    str::FromStr,
-};
+use std::str::FromStr;
+use thiserror::Error;
 
 /// StreamDeck object
 pub struct StreamDeck {
@@ -52,52 +50,23 @@ fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
     u16::from_str_radix(s, 16)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    Hid(HidError),
-    Io(IoError),
-    Image(ImageError),
+    #[error(transparent)]
+    Hid(#[from] HidError),
+    #[error(transparent)]
+    Io(#[from] IoError),
+    #[error(transparent)]
+    Image(#[from] ImageError),
 
+    #[error("invalid image size")]
     InvalidImageSize,
+    #[error("invalid key index")]
     InvalidKeyIndex,
+    #[error("unrecognised pid")]
     UnrecognisedPID,
+    #[error("no data")]
     NoData,
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use Error::*;
-
-        match self {
-            Hid(err) => err.fmt(f),
-            Io(err) => err.fmt(f),
-            Image(err) => err.fmt(f),
-            InvalidImageSize => write!(f, "invalid image size"),
-            InvalidKeyIndex => write!(f, "invalid key index"),
-            UnrecognisedPID => write!(f, "unrecognised pid"),
-            NoData => write!(f, "no data"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<HidError> for Error {
-    fn from(e: HidError) -> Self {
-        Self::Hid(e)
-    }
-}
-
-impl From<IoError> for Error {
-    fn from(e: IoError) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl From<ImageError> for Error {
-    fn from(e: ImageError) -> Self {
-        Self::Image(e)
-    }
 }
 
 /// Device USB Product Identifiers (PIDs)
