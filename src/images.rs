@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use image::io::Reader;
-use image::jpeg::JPEGEncoder;
+use image::jpeg::JpegEncoder;
 use image::DynamicImage;
 use image::{imageops::FilterType, ColorType, Pixel, Rgba};
 
@@ -143,8 +143,8 @@ pub(crate) fn load_image(
 
     // Convert to vector with correct encoding
     let v = match colour_order {
-        ColourOrder::BGR => image.to_bgr().into_vec(),
-        ColourOrder::RGB => image.to_rgb().into_vec(),
+        ColourOrder::BGR => image.to_bgr8().into_vec(),
+        ColourOrder::RGB => image.to_rgb8().into_vec(),
     };
 
     if v.len() != x * y * 3 {
@@ -157,7 +157,7 @@ pub(crate) fn load_image(
 /// Encodes a BGR bitmap into a JPEG image for outputting to a V2 device
 pub(crate) fn encode_jpeg(image: &[u8], width: usize, height: usize) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::new();
-    let mut encoder = JPEGEncoder::new_with_quality(&mut buf, 100);
+    let mut encoder = JpegEncoder::new_with_quality(&mut buf, 100);
     encoder.encode(image, width as u32, height as u32, ColorType::Rgb8)?;
     Ok(buf)
 }
