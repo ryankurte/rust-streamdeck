@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::io::Error as IoError;
 use std::time::Duration;
 
@@ -67,6 +66,10 @@ pub enum Error {
     UnrecognisedPID,
     #[error("no data")]
     NoData,
+}
+
+pub struct DeviceImage {
+    data: Vec<u8>,
 }
 
 /// Device USB Product Identifiers (PIDs)
@@ -236,6 +239,22 @@ impl StreamDeck {
         self.kind.image_size()
     }
 
+    /// Convert an image into the device dependent format
+    fn convert_image(&self, image: Vec<u8>) -> Result<DeviceImage, Error> {
+            // Check image dimensions
+        if image.len() != self.kind.image_size_bytes() {
+            return Err(Error::InvalidImageSize);
+        }
+        let image = match self.kind.image_mode() {
+            ImageMode::Bmp => image,
+            ImageMode::Jpeg => {
+                let (w, h) = self.kind.image_size();
+                encode_jpeg(&image, w, h)?
+            }
+        };
+        Ok(DeviceImage{ data: image })
+    }
+
     /// Set a button to the provided RGB colour
     pub fn set_button_rgb(&mut self, key: u8, colour: &Colour) -> Result<(), Error> {
         let mut image = vec![0u8; self.kind.image_size_bytes()];
@@ -259,8 +278,7 @@ impl StreamDeck {
                 _ => unreachable!(),
             };
         }
-
-        self.write_button_image(key, &image)?;
+        self.write_button_image(key, &self.convert_image(image)?)?;
 
         Ok(())
     }
@@ -269,10 +287,10 @@ impl StreamDeck {
     pub fn set_button_image(&mut self, key: u8, image: DynamicImage) -> Result<(), Error> {
         let image = apply_transform(image, self.kind.image_rotation(), self.kind.image_mirror());
         let image = match self.kind.image_colour_order() {
-            ColourOrder::BGR => image.into_bgr().into_vec(),
-            ColourOrder::RGB => image.into_rgb().into_vec(),
+            ColourOrder::BGR => image.into_bgra8().into_vec(),
+            ColourOrder::RGB => image.into_rgb8().into_vec(),
         };
-        self.write_button_image(key, &image)
+        self.write_button_image(key, &self.convert_image(image)?)
     }
 
     /// Sets a button to the provided text.
@@ -310,6 +328,16 @@ impl StreamDeck {
         image: &str,
         opts: &ImageOptions,
     ) -> Result<(), Error> {
+
+        self.write_button_image(key, &self.load_image(image, opts)?)
+    }
+
+    /// Load an image file into the device specific representation
+    pub fn load_image(
+        &self,
+        image: &str,
+        opts: &ImageOptions,
+    ) -> Result<DeviceImage, Error> {
         let (x, y) = self.kind.image_size();
         let rotate = self.kind.image_rotation();
         let mirror = self.kind.image_mirror();
@@ -323,10 +351,7 @@ impl StreamDeck {
             opts,
             self.kind.image_colour_order(),
         )?;
-
-        self.write_button_image(key, &image)?;
-
-        Ok(())
+        self.convert_image(image)
     }
 
     /// Transforms a key from zero-indexed left-to-right into the device-correct coordinate system
@@ -350,21 +375,10 @@ impl StreamDeck {
 
     /// Writes an image to a button
     /// Image at this point in correct dimensions and in device native colour order.
-    fn write_button_image(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
-        // Check image dimensions
-        if image.len() != self.kind.image_size_bytes() {
-            return Err(Error::InvalidImageSize);
-        }
+    pub fn write_button_image(&mut self, key: u8, image: &DeviceImage) -> Result<(), Error> {
 
+        let image = &image.data;
         let key = self.translate_key_index(key)?;
-
-        let image = match self.kind.image_mode() {
-            ImageMode::Bmp => Cow::from(image),
-            ImageMode::Jpeg => {
-                let (w, h) = self.kind.image_size();
-                Cow::from(encode_jpeg(image, w, h)?)
-            }
-        };
 
         let mut buf = vec![0u8; self.kind.image_report_len()];
         let base = self.kind.image_base();
