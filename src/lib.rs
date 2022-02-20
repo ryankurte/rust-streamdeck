@@ -78,6 +78,7 @@ pub mod pids {
     pub const ORIGINAL_V2: u16 = 0x006d;
     pub const MINI: u16 = 0x0063;
     pub const XL: u16 = 0x006c;
+    pub const MK2: u16 = 0x0080;
 }
 
 impl StreamDeck {
@@ -102,6 +103,7 @@ impl StreamDeck {
 
             pids::ORIGINAL_V2 => Kind::OriginalV2,
             pids::XL => Kind::Xl,
+            pids::MK2 => Kind::Mk2,
 
             _ => return Err(Error::UnrecognisedPID),
         };
