@@ -69,7 +69,7 @@ pub enum Error {
 }
 
 pub struct DeviceImage {
-    data: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 /// Device USB Product Identifiers (PIDs)
