@@ -74,7 +74,7 @@ pub struct DeviceImage {
 
 impl DeviceImage {
     /// Constructs [DeviceImage] from a byte array
-    pub fn from_raw(data: Vec<u8>) -> Self {
+    pub fn from_bytes(data: Vec<u8>) -> Self {
         Self::from(data)
     }
 }
