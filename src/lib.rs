@@ -72,6 +72,21 @@ pub struct DeviceImage {
     data: Vec<u8>,
 }
 
+impl DeviceImage {
+    /// Constructs [DeviceImage] from a byte array
+    pub fn from_bytes(data: Vec<u8>) -> Self {
+        Self::from(data)
+    }
+}
+
+impl From<Vec<u8>> for DeviceImage {
+    fn from(data: Vec<u8>) -> Self {
+        Self {
+            data
+        }
+    }
+}
+
 /// Device USB Product Identifiers (PIDs)
 pub mod pids {
     pub const ORIGINAL: u16 = 0x0060;
