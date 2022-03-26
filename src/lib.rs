@@ -373,7 +373,7 @@ impl StreamDeck {
 
     /// Transforms a key from zero-indexed left-to-right into the device-correct coordinate system
     fn translate_key_index(&self, key: u8) -> Result<u8, Error> {
-        if key >= self.kind.keys() {
+        if key > self.kind.keys() {
             return Err(Error::InvalidKeyIndex);
         }
         let mapped = match self.kind.key_direction() {
