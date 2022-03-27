@@ -304,7 +304,7 @@ impl StreamDeck {
     pub fn set_button_image(&mut self, key: u8, image: DynamicImage) -> Result<(), Error> {
         let image = apply_transform(image, self.kind.image_rotation(), self.kind.image_mirror());
         let image = match self.kind.image_colour_order() {
-            ColourOrder::BGR => image.into_bgra8().into_vec(),
+            ColourOrder::BGR => image.into_bgr8().into_vec(),
             ColourOrder::RGB => image.into_rgb8().into_vec(),
         };
         self.write_button_image(key, &self.convert_image(image)?)
@@ -373,7 +373,7 @@ impl StreamDeck {
 
     /// Transforms a key from zero-indexed left-to-right into the device-correct coordinate system
     fn translate_key_index(&self, key: u8) -> Result<u8, Error> {
-        if key >= self.kind.keys() {
+        if key > self.kind.keys() {
             return Err(Error::InvalidKeyIndex);
         }
         let mapped = match self.kind.key_direction() {
