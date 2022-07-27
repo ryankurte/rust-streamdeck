@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 use image::io::Reader;
-use image::jpeg::JpegEncoder;
+use image::codecs::jpeg::JpegEncoder;
 use image::DynamicImage;
 use image::{imageops::FilterType, ColorType, Pixel, Rgba};
 
 use crate::info::{ColourOrder, Mirroring, Rotation};
-use crate::Error;
+use crate::{Error, rgb_to_bgr};
 
 /// Simple Colour object for re-writing backgrounds etc.
 #[derive(Debug, Clone)]
@@ -142,10 +142,11 @@ pub(crate) fn load_image(
     }
 
     // Convert to vector with correct encoding
-    let v = match colour_order {
-        ColourOrder::BGR => image.to_bgr8().into_vec(),
-        ColourOrder::RGB => image.to_rgb8().into_vec(),
-    };
+    let mut v= image.to_rgb8().into_vec();
+    if matches!(colour_order, ColourOrder::BGR) {
+        rgb_to_bgr(&mut v);
+    }
+
 
     if v.len() != x * y * 3 {
         return Err(Error::InvalidImageSize);

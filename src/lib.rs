@@ -1,4 +1,4 @@
-use std::io::Error as IoError;
+use std::{io::Error as IoError};
 use std::time::Duration;
 
 #[macro_use]
@@ -303,11 +303,11 @@ impl StreamDeck {
     /// Set a button to the provided image
     pub fn set_button_image(&mut self, key: u8, image: DynamicImage) -> Result<(), Error> {
         let image = apply_transform(image, self.kind.image_rotation(), self.kind.image_mirror());
-        let image = match self.kind.image_colour_order() {
-            ColourOrder::BGR => image.into_bgr8().into_vec(),
-            ColourOrder::RGB => image.into_rgb8().into_vec(),
-        };
-        self.write_button_image(key, &self.convert_image(image)?)
+        let mut data = image.into_rgb8().into_vec();
+        if matches!(self.kind.image_colour_order(), ColourOrder::BGR) {
+            rgb_to_bgr(&mut data);
+        }
+        self.write_button_image(key, &self.convert_image(data)?)
     }
 
     /// Sets a button to the provided text.
@@ -330,7 +330,7 @@ impl StreamDeck {
                 let mut y = *y;
                 text.to_string().split("\n").for_each(|txt| {
                     draw_text_mut(&mut image, colour, *x, y, opts.scale, font, txt);
-                    y += (opts.scale.y * opts.line_height).round() as u32;
+                    y += (opts.scale.y * opts.line_height).round() as i32;
                 });
             }
         }
@@ -488,7 +488,7 @@ impl StreamDeck {
 /// TextPosition is how to position text via set_button_text
 pub enum TextPosition {
     /// Absolute positioning
-    Absolute { x: u32, y: u32 },
+    Absolute { x: i32, y: i32 },
 }
 
 /// Text Options provide values for text buttons
@@ -520,5 +520,12 @@ impl Default for TextOptions {
             scale: Scale { x: 15.0, y: 15.0 },
             line_height: 1.1,
         }
+    }
+}
+
+// Convert RGB image data to BGR
+fn rgb_to_bgr(data: &mut Vec<u8>) {
+    for chunk in data.chunks_exact_mut(3) {
+        chunk.swap(0, 2);
     }
 }
