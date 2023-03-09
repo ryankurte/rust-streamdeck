@@ -5,7 +5,7 @@ pub enum Kind {
     OriginalV2,
     Mini,
     Xl,
-    Mk2
+    Mk2,
 }
 
 /// Stream Deck key layout direction
