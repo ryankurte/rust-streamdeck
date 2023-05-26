@@ -45,7 +45,7 @@ pub struct Filter {
     pub serial: Option<String>,
 }
 
-fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
+pub fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
     u16::from_str_radix(s, 16)
 }
 
