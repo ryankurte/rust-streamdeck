@@ -45,6 +45,15 @@ pub struct Filter {
     pub serial: Option<String>,
 }
 
+/// Parse hexadecimal formatted string to integer
+///
+/// Helper function for parsing PID and VID command line arguments.
+///
+/// #Example
+/// ```
+///     #[structopt(parse(try_from_str=streamdeck::u16_parse_hex))]
+///     pid: u16,
+/// ```
 pub fn u16_parse_hex(s: &str) -> Result<u16, std::num::ParseIntError> {
     u16::from_str_radix(s, 16)
 }
