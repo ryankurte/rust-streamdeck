@@ -13,7 +13,7 @@ util = [ "structopt", "simplelog", "humantime" ]
 default = [ "util" ]
 
 [dependencies]
-hidapi = "1.2"
+hidapi = "2.4"
 log = "0.4.8"
 image = "0.24.3"
 imageproc = "0.23.0"
