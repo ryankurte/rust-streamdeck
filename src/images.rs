@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
-use image::io::Reader;
 use image::codecs::jpeg::JpegEncoder;
-use image::DynamicImage;
-use image::{imageops::FilterType, ColorType, Pixel, Rgba};
+use image::io::Reader;
+use image::{imageops::FilterType, Pixel, Rgba};
+use image::{DynamicImage, ExtendedColorType};
 
 use crate::info::{ColourOrder, Mirroring, Rotation};
-use crate::{Error, rgb_to_bgr};
+use crate::{rgb_to_bgr, Error};
 
 /// Simple Colour object for re-writing backgrounds etc.
 #[derive(Debug, Clone)]
@@ -142,11 +142,10 @@ pub(crate) fn load_image(
     }
 
     // Convert to vector with correct encoding
-    let mut v= image.to_rgb8().into_vec();
+    let mut v = image.to_rgb8().into_vec();
     if matches!(colour_order, ColourOrder::BGR) {
         rgb_to_bgr(&mut v);
     }
-
 
     if v.len() != x * y * 3 {
         return Err(Error::InvalidImageSize);
@@ -159,7 +158,7 @@ pub(crate) fn load_image(
 pub(crate) fn encode_jpeg(image: &[u8], width: usize, height: usize) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::new();
     let mut encoder = JpegEncoder::new_with_quality(&mut buf, 100);
-    encoder.encode(image, width as u32, height as u32, ColorType::Rgb8)?;
+    encoder.encode(image, width as u32, height as u32, ExtendedColorType::Rgb8)?;
     Ok(buf)
 }
 
