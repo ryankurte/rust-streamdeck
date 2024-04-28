@@ -118,7 +118,7 @@ impl StreamDeck {
             pids::ORIGINAL_V2 => Kind::OriginalV2,
             pids::XL => Kind::Xl,
             pids::MK2 => Kind::Mk2,
-            pids::REVISED_MINI => Kind::Mini,
+            pids::REVISED_MINI => Kind::RevisedMini,
 
             _ => return Err(Error::UnrecognisedPID),
         };
@@ -373,7 +373,7 @@ impl StreamDeck {
         }
         let mapped = match self.kind.key_direction() {
             // All but the original Streamdeck already have correct coordinates
-            KeyDirection::LeftToRight => key,
+            KeyDirection::LeftToRight => key + self.kind.key_index_offset(),
             // The original Streamdeck uses 1-indexed right-to-left
             KeyDirection::RightToLeft => {
                 let cols = self.kind.key_columns() as u8;
