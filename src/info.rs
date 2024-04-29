@@ -106,7 +106,7 @@ impl Kind {
 
     pub fn image_rotation(&self) -> Rotation {
         match self {
-            Kind::Mini => Rotation::Rot270,
+            Kind::Mini | Kind::RevisedMini => Rotation::Rot270,
             _ => Rotation::Rot0,
         }
     }
