@@ -4,6 +4,7 @@ pub enum Kind {
     Original,
     OriginalV2,
     Mini,
+    RevisedMini,
     Xl,
     Mk2,
 }
@@ -51,7 +52,7 @@ impl Kind {
     pub fn keys(&self) -> u8 {
         match self {
             Kind::Original | Kind::OriginalV2 | Kind::Mk2 => 15,
-            Kind::Mini => 6,
+            Kind::Mini | Kind::RevisedMini => 6,
             Kind::Xl => 32,
         }
     }
@@ -61,7 +62,7 @@ impl Kind {
         match self {
             Kind::Original => 0,
             Kind::OriginalV2 | Kind::Mk2 => 3,
-            Kind::Mini => 0,
+            Kind::Mini | Kind::RevisedMini => 0,
             Kind::Xl => 3,
         }
     }
@@ -73,9 +74,16 @@ impl Kind {
         }
     }
 
+    pub(crate) fn key_index_offset(&self) -> u8 {
+        match self {
+            Kind::RevisedMini => 1,
+            _ => 0,
+        }
+    }
+
     pub(crate) fn key_columns(&self) -> u8 {
         match self {
-            Kind::Mini => 3,
+            Kind::Mini | Kind::RevisedMini => 3,
             Kind::Original | Kind::OriginalV2 | Kind::Mk2 => 5,
             Kind::Xl => 8,
         }
@@ -83,7 +91,7 @@ impl Kind {
 
     pub fn image_mode(&self) -> ImageMode {
         match self {
-            Kind::Original | Kind::Mini => ImageMode::Bmp,
+            Kind::Original | Kind::Mini | Kind::RevisedMini => ImageMode::Bmp,
             Kind::OriginalV2 | Kind::Xl | Kind::Mk2 => ImageMode::Jpeg,
         }
     }
@@ -91,14 +99,14 @@ impl Kind {
     pub fn image_size(&self) -> (usize, usize) {
         match self {
             Kind::Original | Kind::OriginalV2 | Kind::Mk2 => (72, 72),
-            Kind::Mini => (80, 80),
+            Kind::Mini | Kind::RevisedMini => (80, 80),
             Kind::Xl => (96, 96),
         }
     }
 
     pub fn image_rotation(&self) -> Rotation {
         match self {
-            Kind::Mini => Rotation::Rot270,
+            Kind::Mini | Kind::RevisedMini => Rotation::Rot270,
             _ => Rotation::Rot0,
         }
     }
@@ -106,7 +114,7 @@ impl Kind {
     pub fn image_mirror(&self) -> Mirroring {
         match self {
             // Mini has rotation, not mirror
-            Kind::Mini => Mirroring::None,
+            Kind::Mini | Kind::RevisedMini => Mirroring::None,
             // On the original the image is flipped across the Y axis
             Kind::Original => Mirroring::Y,
             // On the V2 devices, both X and Y need to flip
@@ -128,7 +136,7 @@ impl Kind {
 
     pub(crate) fn image_report_header_len(&self) -> usize {
         match self {
-            Kind::Original | Kind::Mini => 16,
+            Kind::Original | Kind::Mini | Kind::RevisedMini => 16,
             Kind::OriginalV2 | Kind::Xl | Kind::Mk2 => 8,
         }
     }
@@ -137,7 +145,7 @@ impl Kind {
         match self {
             // BMP headers for the original and mini
             Kind::Original => &ORIGINAL_IMAGE_BASE,
-            Kind::Mini => &MINI_IMAGE_BASE,
+            Kind::Mini | Kind::RevisedMini => &MINI_IMAGE_BASE,
 
             Kind::OriginalV2 | Kind::Xl | Kind::Mk2 => &[],
         }
@@ -145,7 +153,7 @@ impl Kind {
 
     pub(crate) fn image_colour_order(&self) -> ColourOrder {
         match self {
-            Kind::Original | Kind::Mini => ColourOrder::BGR,
+            Kind::Original | Kind::Mini | Kind::RevisedMini => ColourOrder::BGR,
             Kind::OriginalV2 | Kind::Xl | Kind::Mk2 => ColourOrder::RGB,
         }
     }
