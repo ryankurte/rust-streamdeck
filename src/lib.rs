@@ -480,12 +480,14 @@ impl StreamDeck {
 }
 
 /// TextPosition is how to position text via set_button_text
+#[derive(Debug, Clone)]
 pub enum TextPosition {
     /// Absolute positioning
     Absolute { x: i32, y: i32 },
 }
 
 /// Text Options provide values for text buttons
+#[derive(Debug, Clone)]
 pub struct TextOptions {
     foreground: Colour,
     background: Colour,
