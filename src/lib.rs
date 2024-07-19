@@ -214,20 +214,21 @@ impl StreamDeck {
     }
 
     /// Probe for connected devices. Returns a list of tuples containing the device kind and PID
-    pub fn probe() -> Result<Vec<(Kind, u16)>, Error> {
+    pub fn probe() -> Result<Vec<Result<(Kind, u16), Error>>, Error> {
         let api = HidApi::new()?;
-        let mut available_devices: Vec<(Kind, u16)> = vec![];
+        let mut available_devices = vec![];
         for device in api.device_list() {
-            if device.vendor_id() == 0x0fd9 { // Elgato Vendor ID
-                match device.product_id() {
-                    pids::MK2 => available_devices.push((Kind::Mk2, pids::MK2)),
-                    pids::XL => available_devices.push((Kind::Xl, pids::XL)),
-                    pids::ORIGINAL_V2 => available_devices.push((Kind::OriginalV2, pids::ORIGINAL_V2)),
-                    pids::ORIGINAL => available_devices.push((Kind::Original, pids::ORIGINAL)),
-                    pids::MINI => available_devices.push((Kind::Mini, pids::MINI)),
-                    _ => {} // Should we error here? We would need to return a vector of results then.
-                            // I'd prefer a warn! log message.
+            if device.vendor_id() == 0x0fd9 {
+                let deck = match device.product_id() {
+                    pids::MK2 => Ok((Kind::Mk2, pids::MK2)),
+                    pids::XL => Ok((Kind::Xl, pids::XL)),
+                    pids::ORIGINAL_V2 => Ok((Kind::OriginalV2, pids::ORIGINAL_V2)),
+                    pids::ORIGINAL => Ok((Kind::Original, pids::ORIGINAL)),
+                    pids::MINI => Ok((Kind::Mini, pids::MINI)),
+                    //pids::PLUS => Ok((Kind::Plus, pids::PLUS)),
+                    _ => Err(Error::UnrecognisedPID)
                 };
+                available_devices.push(deck);
             }
         }
         Ok(available_devices)
