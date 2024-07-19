@@ -235,16 +235,17 @@ impl StreamDeck {
             return Err(Error::NoData);
         }
 
+        let mut out = vec![0u8; keys];
+
         if self.kind == Kind::Plus && cmd[1] != 0  {
             // SD Plus specific
             // if the second byte is not 0, the touchscreen or dials are being used
             // This writes data in indices that are normally used for button data
             // This will result in incorrect data being read. 
             warn!("Touchscreen or dials are not supported in this mode");
-            return Ok([0u8; 8].to_vec());
+            return Ok(out);
         }
 
-        let mut out = vec![0u8; keys];
         match self.kind.key_direction() {
             KeyDirection::RightToLeft => {
                 for (i, val) in out.iter_mut().enumerate() {
