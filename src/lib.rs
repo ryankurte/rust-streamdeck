@@ -93,6 +93,7 @@ pub mod pids {
     pub const XL: u16 = 0x006c;
     pub const MK2: u16 = 0x0080;
     pub const REVISED_MINI: u16 = 0x0090;
+    pub const PLUS: u16 = 0x0084;
 }
 
 impl StreamDeck {
@@ -119,7 +120,7 @@ impl StreamDeck {
             pids::XL => Kind::Xl,
             pids::MK2 => Kind::Mk2,
             pids::REVISED_MINI => Kind::RevisedMini,
-
+            pids::PLUS => Kind::Plus,
             _ => return Err(Error::UnrecognisedPID),
         };
 
@@ -213,30 +214,6 @@ impl StreamDeck {
         Ok(())
     }
 
-    /// Probe for connected devices. 
-    /// 
-    /// Returns a list of results, 
-    /// each containing the device kind and PID or an error if the PID is unrecognised
-    pub fn probe() -> Result<Vec<Result<(Kind, u16), Error>>, Error> {
-        let api = HidApi::new()?;
-        let mut available_devices = vec![];
-        for device in api.device_list() {
-            if device.vendor_id() == 0x0fd9 {
-                let deck = match device.product_id() {
-                    pids::MK2 => Ok((Kind::Mk2, pids::MK2)),
-                    pids::XL => Ok((Kind::Xl, pids::XL)),
-                    pids::ORIGINAL_V2 => Ok((Kind::OriginalV2, pids::ORIGINAL_V2)),
-                    pids::ORIGINAL => Ok((Kind::Original, pids::ORIGINAL)),
-                    pids::MINI => Ok((Kind::Mini, pids::MINI)),
-                    //pids::PLUS => Ok((Kind::Plus, pids::PLUS)),
-                    _ => Err(Error::UnrecognisedPID)
-                };
-                available_devices.push(deck);
-            }
-        }
-        Ok(available_devices)
-    }
-
     /// Fetch button states
     ///
     /// In blocking mode this will wait until a report packet has been received
@@ -256,6 +233,15 @@ impl StreamDeck {
 
         if cmd[0] == 0 {
             return Err(Error::NoData);
+        }
+
+        if self.kind == Kind::Plus && cmd[1] != 0  {
+            // SD Plus specific
+            // if the second byte is not 0, the touchscreen or dials are being used
+            // This writes data in indices that are normally used for button data
+            // This will result in incorrect data being read. 
+            warn!("Touchscreen or dials are not supported in this mode");
+            return Ok([0u8; 8].to_vec());
         }
 
         let mut out = vec![0u8; keys];
