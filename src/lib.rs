@@ -213,7 +213,10 @@ impl StreamDeck {
         Ok(())
     }
 
-    /// Probe for connected devices. Returns a list of tuples containing the device kind and PID
+    /// Probe for connected devices. 
+    /// 
+    /// Returns a list of results, 
+    /// each containing the device kind and PID or an error if the PID is unrecognised
     pub fn probe() -> Result<Vec<Result<(Kind, u16), Error>>, Error> {
         let api = HidApi::new()?;
         let mut available_devices = vec![];
