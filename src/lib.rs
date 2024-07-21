@@ -213,6 +213,30 @@ impl StreamDeck {
         Ok(())
     }
 
+    /// Probe for connected devices. 
+    /// 
+    /// Returns a list of results, 
+    /// each containing the device kind and PID or an error if the PID is unrecognised
+    pub fn probe() -> Result<Vec<Result<(Kind, u16), Error>>, Error> {
+        let api = HidApi::new()?;
+        let mut available_devices = vec![];
+        for device in api.device_list() {
+            if device.vendor_id() == 0x0fd9 {
+                let deck = match device.product_id() {
+                    pids::MK2 => Ok((Kind::Mk2, pids::MK2)),
+                    pids::XL => Ok((Kind::Xl, pids::XL)),
+                    pids::ORIGINAL_V2 => Ok((Kind::OriginalV2, pids::ORIGINAL_V2)),
+                    pids::ORIGINAL => Ok((Kind::Original, pids::ORIGINAL)),
+                    pids::MINI => Ok((Kind::Mini, pids::MINI)),
+                    //pids::PLUS => Ok((Kind::Plus, pids::PLUS)),
+                    _ => Err(Error::UnrecognisedPID)
+                };
+                available_devices.push(deck);
+            }
+        }
+        Ok(available_devices)
+    }
+
     /// Fetch button states
     ///
     /// In blocking mode this will wait until a report packet has been received
