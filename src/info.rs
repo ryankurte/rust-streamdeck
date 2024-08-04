@@ -25,6 +25,7 @@ pub enum ImageMode {
 
 /// Stream Deck color mode
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) enum ColourOrder {
     RGB,
     BGR,
@@ -159,10 +160,7 @@ impl Kind {
     }
 
     pub(crate) fn is_v2(&self) -> bool {
-        match self {
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 => true,
-            _ => false,
-        }
+        matches!(self, Kind::OriginalV2 | Kind::Xl | Kind::Mk2)
     }
 }
 

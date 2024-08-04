@@ -15,7 +15,7 @@ default = [ "util" ]
 [dependencies]
 hidapi = "2.4"
 log = "0.4.8"
-image = "0.25.1"
+image = "0.25.2"
 imageproc = "0.24.0"
 thiserror = "1.0.30"
 ab_glyph = "0.2.25"

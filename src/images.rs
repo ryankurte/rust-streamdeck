@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use image::codecs::jpeg::JpegEncoder;
-use image::io::Reader;
+use image::ImageReader;
 use image::{imageops::FilterType, Pixel, Rgba};
 use image::{DynamicImage, ExtendedColorType};
 
@@ -28,7 +28,7 @@ impl FromStr for Colour {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 6 && s.len() != 8 {
-            return Err(format!("Expected colour in the hex form: RRGGBB"));
+            return Err("Expected colour in the hex form: RRGGBB".to_string());
         }
 
         let r =
@@ -43,7 +43,7 @@ impl FromStr for Colour {
 }
 
 /// Options for image loading and editing
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[cfg_attr(feature = "structopt", derive(structopt::StructOpt))]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ImageOptions {
@@ -62,15 +62,6 @@ impl ImageOptions {
     }
 }
 
-impl Default for ImageOptions {
-    fn default() -> Self {
-        Self {
-            background: None,
-            invert: false,
-        }
-    }
-}
-
 pub(crate) fn apply_transform(
     image: DynamicImage,
     rotation: Rotation,
@@ -82,13 +73,12 @@ pub(crate) fn apply_transform(
         Rotation::Rot180 => image.rotate180(),
         Rotation::Rot270 => image.rotate270(),
     };
-    let image = match mirroring {
+    match mirroring {
         Mirroring::None => image,
         Mirroring::X => image.flipv(),
         Mirroring::Y => image.fliph(),
         Mirroring::Both => image.flipv().fliph(),
-    };
-    image
+    }
 }
 
 /// Load an image from a file, resize to defined x and y, and apply the provided options
@@ -102,7 +92,7 @@ pub(crate) fn load_image(
     colour_order: ColourOrder,
 ) -> Result<Vec<u8>, Error> {
     // Open image reader
-    let reader = match Reader::open(path) {
+    let reader = match ImageReader::open(path) {
         Ok(v) => v,
         Err(e) => {
             error!("error loading file '{}': {:?}", path, e);
