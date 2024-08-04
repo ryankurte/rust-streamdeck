@@ -277,17 +277,17 @@ impl StreamDeck {
         let mut image = vec![0u8; self.kind.image_size_bytes()];
         let colour_order = self.kind.image_colour_order();
 
-        for i in 0..image.len() {
+        for (i, image_byte) in image.iter_mut().enumerate() {
             match i % 3 {
                 0 => {
-                    image[i] = match colour_order {
+                    *image_byte = match colour_order {
                         ColourOrder::BGR => colour.b,
                         ColourOrder::RGB => colour.r,
                     }
                 }
-                1 => image[i] = colour.g,
+                1 => *image_byte = colour.g,
                 2 => {
-                    image[i] = match colour_order {
+                    *image_byte = match colour_order {
                         ColourOrder::BGR => colour.r,
                         ColourOrder::RGB => colour.b,
                     }
@@ -328,7 +328,7 @@ impl StreamDeck {
         match pos {
             TextPosition::Absolute { x, y } => {
                 let mut y = *y;
-                text.to_string().split("\n").for_each(|txt| {
+                text.split("\n").for_each(|txt| {
                     draw_text_mut(&mut image, colour, *x, y, opts.scale, font, txt);
                     y += (opts.scale.y * opts.line_height).round() as i32;
                 });
@@ -376,7 +376,7 @@ impl StreamDeck {
             KeyDirection::LeftToRight => key + self.kind.key_index_offset(),
             // The original Streamdeck uses 1-indexed right-to-left
             KeyDirection::RightToLeft => {
-                let cols = self.kind.key_columns() as u8;
+                let cols = self.kind.key_columns();
                 let col = key % cols;
                 let row = key / cols;
                 row * cols + cols - col
@@ -520,7 +520,7 @@ impl Default for TextOptions {
 }
 
 // Convert RGB image data to BGR
-fn rgb_to_bgr(data: &mut Vec<u8>) {
+fn rgb_to_bgr(data: &mut [u8]) {
     for chunk in data.chunks_exact_mut(3) {
         chunk.swap(0, 2);
     }
