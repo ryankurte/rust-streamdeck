@@ -64,6 +64,8 @@ pub enum Error {
     InvalidKeyIndex,
     #[error("unrecognised pid")]
     UnrecognisedPID,
+    #[error("unsupported input")]
+    UnsupportedInput,
     #[error("no data")]
     NoData,
 }
@@ -93,6 +95,7 @@ pub mod pids {
     pub const XL: u16 = 0x006c;
     pub const MK2: u16 = 0x0080;
     pub const REVISED_MINI: u16 = 0x0090;
+    pub const PLUS: u16 = 0x0084;
 }
 
 impl StreamDeck {
@@ -119,6 +122,7 @@ impl StreamDeck {
             pids::XL => Kind::Xl,
             pids::MK2 => Kind::Mk2,
             pids::REVISED_MINI => Kind::RevisedMini,
+            pids::PLUS => Kind::Plus,
 
             _ => return Err(Error::UnrecognisedPID),
         };
@@ -228,7 +232,7 @@ impl StreamDeck {
                     pids::ORIGINAL_V2 => Ok((Kind::OriginalV2, pids::ORIGINAL_V2)),
                     pids::ORIGINAL => Ok((Kind::Original, pids::ORIGINAL)),
                     pids::MINI => Ok((Kind::Mini, pids::MINI)),
-                    //pids::PLUS => Ok((Kind::Plus, pids::PLUS)),
+                    pids::PLUS => Ok((Kind::Plus, pids::PLUS)),
                     _ => Err(Error::UnrecognisedPID)
                 };
                 available_devices.push(deck);
@@ -256,6 +260,14 @@ impl StreamDeck {
 
         if cmd[0] == 0 {
             return Err(Error::NoData);
+        }
+
+        if self.kind == Kind::Plus {
+            //If the second byte is not 0, a dial or the touchscreen was used, we don't support that here
+            //This would write to indices which represent buttons and thus create faulty output
+            if cmd[1] != 0 {
+                return Err(Error::UnsupportedInput);
+            }
         }
 
         let mut out = vec![0u8; keys];
