@@ -10,6 +10,7 @@ pub enum Kind {
     Plus
 }
 
+
 /// Stream Deck key layout direction
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum KeyDirection {
