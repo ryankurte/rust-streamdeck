@@ -32,8 +32,6 @@ pub enum Commands {
     Reset,
     /// Fetch the device firmware version
     Version,
-    /// Search for connected streamdecks
-    Probe,
     /// Set device display brightness
     SetBrightness{
         /// Brightness value from 0 to 100
@@ -121,20 +119,6 @@ fn do_command(deck: &mut StreamDeck, cmd: Commands) -> Result<(), Error> {
                 }
             }
         },
-        Commands::Probe => {
-            let results = StreamDeck::probe()?;
-            if results.is_empty() {
-                info!("No devices found");
-                return Ok(());
-            }
-            info!("Found {} devices", results.len());
-            for res in results {
-                match res {
-                    Ok((device, pid)) => info!("Streamdeck: {:?} (pid: {:#x})", device, pid),
-                    Err(_) => warn!("Found Elgato device with unsupported PID"),
-                }
-            }
-        }
         Commands::SetColour{key, colour} => {
             info!("Setting key {} colour to: ({:?})", key, colour);
             deck.set_button_rgb(key, &colour)?;

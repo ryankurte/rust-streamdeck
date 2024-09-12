@@ -123,7 +123,6 @@ impl StreamDeck {
             pids::MK2 => Kind::Mk2,
             pids::REVISED_MINI => Kind::RevisedMini,
             pids::PLUS => Kind::Plus,
-
             _ => return Err(Error::UnrecognisedPID),
         };
 
@@ -217,6 +216,7 @@ impl StreamDeck {
         Ok(())
     }
 
+
     /// Probe for connected devices. 
     /// 
     /// Returns a list of results, 
@@ -271,6 +271,16 @@ impl StreamDeck {
         }
 
         let mut out = vec![0u8; keys];
+
+        if self.kind == Kind::Plus && cmd[1] != 0  {
+            // SD Plus specific
+            // if the second byte is not 0, the touchscreen or dials are being used
+            // This writes data in indices that are normally used for button data
+            // This will result in incorrect data being read. 
+            warn!("Touchscreen or dials are not supported in this mode");
+            return Ok(out);
+        }
+
         match self.kind.key_direction() {
             KeyDirection::RightToLeft => {
                 for (i, val) in out.iter_mut().enumerate() {

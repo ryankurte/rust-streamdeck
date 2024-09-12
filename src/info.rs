@@ -7,8 +7,9 @@ pub enum Kind {
     RevisedMini,
     Xl,
     Mk2,
-    Plus,
+    Plus
 }
+
 
 /// Stream Deck key layout direction
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -55,7 +56,7 @@ impl Kind {
             Kind::Original | Kind::OriginalV2 | Kind::Mk2 => 15,
             Kind::Mini | Kind::RevisedMini => 6,
             Kind::Xl => 32,
-            Kind::Plus => 8,
+            Kind::Plus => 8
         }
     }
 
