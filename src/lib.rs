@@ -17,6 +17,10 @@ pub use crate::images::{Colour, ImageOptions};
 
 pub mod info;
 pub use info::*;
+pub use info::Kind;
+
+pub mod input;
+pub use input::*;
 
 use imageproc::drawing::draw_text_mut;
 use std::str::FromStr;
@@ -24,7 +28,7 @@ use thiserror::Error;
 
 /// StreamDeck object
 pub struct StreamDeck {
-    kind: Kind,
+    pub kind: Kind,
     device: HidDevice,
 }
 
@@ -239,6 +243,22 @@ impl StreamDeck {
             }
         }
         Ok(available_devices)
+    }
+
+    /// Read input from the device
+    /// 
+    /// This is a raw read of the device input and is not recommended for general use.
+    pub fn read_input(&mut self, timeout: Option<Duration>) -> Result<[u8; 36], Error> {
+        let mut cmd = [0u8; 36];
+        
+        match timeout {
+            Some(t) => self
+                .device
+                .read_timeout(&mut cmd, t.as_millis() as i32)?,
+            None => self.device.read(&mut cmd)?,
+        };
+
+        Ok(cmd)
     }
 
     /// Fetch button states

@@ -9,7 +9,9 @@ use structopt::StructOpt;
 extern crate humantime;
 use humantime::Duration;
 
-use streamdeck::{StreamDeck, Filter, Colour, ImageOptions, Error};
+use streamdeck::{info, Colour, Error, Filter, ImageOptions, InputEvent, InputManager, Kind, StreamDeck};
+
+
 
 #[derive(StructOpt)]
 #[structopt(name = "streamdeck-cli", about = "A CLI for the Elgato StreamDeck")]
@@ -47,6 +49,16 @@ pub enum Commands {
         /// Read continuously
         continuous: bool,
     },
+    /// Fetch input events
+    GetInput {
+        #[structopt(long)]
+        /// Timeout for input reading
+        timeout: Option<Duration>,
+
+        #[structopt(long)]
+        /// Read continuously
+        continuous: bool,
+    },
     /// Set button colours
     SetColour {
         /// Index of button to be set
@@ -65,7 +77,8 @@ pub enum Commands {
 
         #[structopt(flatten)]
         opts: ImageOptions,
-    }
+    },
+    Probe,
 }
 
 fn main() {
@@ -116,6 +129,29 @@ fn do_command(deck: &mut StreamDeck, cmd: Commands) -> Result<(), Error> {
 
                 if !continuous {
                     break
+                }
+            }
+        },
+        Commands::GetInput {
+            timeout,
+            continuous,
+        } => {
+            let mut manager = InputManager::new(deck);
+            loop {
+                let input = manager.handle_input(timeout.map(|t| *t))?;
+                info!("input: {:?}", input);
+
+                if !continuous {
+                    break;
+                }
+            }
+        },
+        Commands::Probe => {
+            let results = StreamDeck::probe()?;
+            for result in results {
+                match result {
+                    Ok(deck) => info!("Found device: {:?} (pid: {:#X})", deck.0, deck.1),
+                    Err(e) => error!("Error probing device: {:?}", e),
                 }
             }
         },
