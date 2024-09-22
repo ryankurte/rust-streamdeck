@@ -9,7 +9,9 @@ use structopt::StructOpt;
 extern crate humantime;
 use humantime::Duration;
 
-use streamdeck::{StreamDeck, Filter, Colour, ImageOptions, Error};
+pub use streamdeck::{info, Colour, Error, Filter, ImageOptions, InputEvent, InputManager, Kind, StreamDeck};
+
+
 
 #[derive(StructOpt)]
 #[structopt(name = "streamdeck-cli", about = "A CLI for the Elgato StreamDeck")]
@@ -32,8 +34,6 @@ pub enum Commands {
     Reset,
     /// Fetch the device firmware version
     Version,
-    /// Search for connected streamdecks
-    Probe,
     /// Set device display brightness
     SetBrightness{
         /// Brightness value from 0 to 100
@@ -43,6 +43,16 @@ pub enum Commands {
     GetButtons {
         #[structopt(long)]
         /// Timeout for button reading
+        timeout: Option<Duration>,
+
+        #[structopt(long)]
+        /// Read continuously
+        continuous: bool,
+    },
+    /// Fetch input events
+    GetInput {
+        #[structopt(long)]
+        /// Timeout for input reading
         timeout: Option<Duration>,
 
         #[structopt(long)]
@@ -67,7 +77,8 @@ pub enum Commands {
 
         #[structopt(flatten)]
         opts: ImageOptions,
-    }
+    },
+    Probe,
 }
 
 fn main() {
@@ -121,20 +132,29 @@ fn do_command(deck: &mut StreamDeck, cmd: Commands) -> Result<(), Error> {
                 }
             }
         },
-        Commands::Probe => {
-            let results = StreamDeck::probe()?;
-            if results.is_empty() {
-                info!("No devices found");
-                return Ok(());
-            }
-            info!("Found {} devices", results.len());
-            for res in results {
-                match res {
-                    Ok((device, pid)) => info!("Streamdeck: {:?} (pid: {:#x})", device, pid),
-                    Err(_) => warn!("Found Elgato device with unsupported PID"),
+        Commands::GetInput {
+            timeout,
+            continuous,
+        } => {
+            let mut manager = InputManager::new(deck);
+            loop {
+                let input = manager.handle_input(timeout.map(|t| *t))?;
+                info!("input: {:?}", input);
+
+                if !continuous {
+                    break;
                 }
             }
-        }
+        },
+        Commands::Probe => {
+            let results = StreamDeck::probe()?;
+            for result in results {
+                match result {
+                    Ok(deck) => info!("Found device: {:?} (pid: {:#X})", deck.0, deck.1),
+                    Err(e) => error!("Error probing device: {:?}", e),
+                }
+            }
+        },
         Commands::SetColour{key, colour} => {
             info!("Setting key {} colour to: ({:?})", key, colour);
             deck.set_button_rgb(key, &colour)?;
