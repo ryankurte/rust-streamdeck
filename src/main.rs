@@ -9,7 +9,7 @@ use structopt::StructOpt;
 extern crate humantime;
 use humantime::Duration;
 
-use streamdeck::{info, Colour, Error, Filter, ImageOptions, InputEvent, InputManager, Kind, StreamDeck};
+pub use streamdeck::{info, Colour, Error, Filter, ImageOptions, InputEvent, InputManager, Kind, StreamDeck};
 
 
 

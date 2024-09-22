@@ -89,13 +89,14 @@ impl <'a> InputManager<'a> {
         //SD Plus has Dials and Touchscreen, other models only have buttons
         if kind == Kind::Plus {
             return Ok(match cmd[1] {
-                0 => self.handle_button_event(&cmd, &kind),
+                0 => self.handle_button_event(&cmd, &kind)?,
                 2 => self.handle_touchscreen_event(&cmd, &kind)?,
                 3 => self.handle_dial_event(&cmd, &kind),
                 _ => return Err(crate::Error::UnsupportedInput),
             });
         }
-        Ok(self.handle_button_event(&cmd, &kind))
+
+        Ok(self.handle_button_event(&cmd, &kind)?)
     }
 
     ///Handles touchscreen events (short touch, long touch, drag) and returns a Vec of InputEvents
@@ -187,28 +188,26 @@ impl <'a> InputManager<'a> {
     }
 
     ///Handles button events (press, release) and returns a Vec of InputEvents
-    fn handle_button_event(&mut self, cmd: &[u8; 36], kind: &Kind) -> Vec<InputEvent> {
+    fn handle_button_event(&mut self, cmd: &[u8; 36], kind: &Kind) -> Result<Vec<InputEvent>, crate::Error> {
         let mut fresh_presses = HashSet::new();
         let mut events = Vec::new();
         let keys = kind.keys() as usize;
         let offset = kind.key_data_offset();
-        
-        for i in offset..offset + keys  {
 
+        for i in 1 + offset..offset + keys + 1  {
             if cmd[i] == 0 {
                 continue;
             }
 
             let button = match self.deck.kind.key_direction() {
-                KeyDirection::RightToLeft => keys as u8 - (i - offset) as u8,
-                KeyDirection::LeftToRight => i as u8 + self.deck.kind.key_index_offset(),
+                KeyDirection::RightToLeft => self.deck.translate_key_index((i - offset) as u8)? - 1,
+                KeyDirection::LeftToRight => (i - offset - 1) as u8,
             };
 
             // If the button was already reported as pressed, skip it
             if self.pressed_keys.contains(&button) {
                 continue;
             }
-
 
             // If the button press is fresh, add it to the fresh_presses HashSet and the events Vec
             fresh_presses.insert(button);
@@ -232,6 +231,6 @@ impl <'a> InputManager<'a> {
 
         // Add the fresh_presses HashSet to the pressed_keys HashSet
         self.pressed_keys.extend(fresh_presses);
-        events
+        Ok(events)
     }
 }

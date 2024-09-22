@@ -283,23 +283,14 @@ impl StreamDeck {
         }
 
         if self.kind == Kind::Plus {
-            //If the second byte is not 0, a dial or the touchscreen was used, we don't support that here
-            //This would write to indices which represent buttons and thus create faulty output
+            //If the second byte on SD Plus is not 0, a dial or the touchscreen was used, we don't support that here
+            //This would write to indices which represent buttons here and thus create faulty output
             if cmd[1] != 0 {
                 return Err(Error::UnsupportedInput);
             }
         }
 
         let mut out = vec![0u8; keys];
-
-        if self.kind == Kind::Plus && cmd[1] != 0  {
-            // SD Plus specific
-            // if the second byte is not 0, the touchscreen or dials are being used
-            // This writes data in indices that are normally used for button data
-            // This will result in incorrect data being read. 
-            warn!("Touchscreen or dials are not supported in this mode");
-            return Ok(out);
-        }
 
         match self.kind.key_direction() {
             KeyDirection::RightToLeft => {
