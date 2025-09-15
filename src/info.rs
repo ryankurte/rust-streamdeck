@@ -151,9 +151,8 @@ impl Kind {
 
     pub(crate) fn image_report_header_len(&self) -> usize {
         match self {
-            Kind::Original | Kind::Mini | Kind::RevisedMini => 16,
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus => 8,
-            Kind::Module6Keys | Kind::Module15Keys | Kind::Module32Keys => 16, // ?
+            Kind::Original | Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => 16,
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys => 8
         }
     }
 

@@ -557,7 +557,32 @@ impl StreamDeck {
         is_last: bool,
         payload_len: usize,
     ) {
-        if self.kind.is_v2() {
+        if self.kind.is_module() {
+            match self.kind {
+                // https://docs.elgato.com/streamdeck/hid/module-6/#upload-data-to-image-memory-bank
+                Kind::Module6Keys => {
+                    buf[0] = 0x02; // ReportID
+                    buf[1] = 0x01; // Command
+                    buf[2] = sequence as u8; // Chunk Index
+                    buf[3] = 0x00; // Reserved
+                    buf[4] = if is_last { 0x01 } else { 0x00 }; // Show Image flag
+                    buf[5] = key;
+                    buf[6..10].copy_from_slice(&[0x00,0x00,0x00,0x00]);
+                }
+                // https://docs.elgato.com/streamdeck/hid/module-15_32#output-reports
+                // basically same as v2
+                Kind::Module15Keys | Kind::Module32Keys => {
+                    buf[0] = 0x02; // Report ID
+                    buf[1] = 0x07; // Command
+                    buf[2] = key; // Key Index
+                    buf[3] = if is_last { 1 } else { 0 }; // Transfer is Done flag (0x01 = last chunk)
+                    buf[4..6].copy_from_slice(&(payload_len as u16).to_le_bytes()); // Chunk Contents Size
+                    buf[6..8].copy_from_slice(&sequence.to_le_bytes()); // Chunk Index (zero-based)
+                }
+                _ => unreachable!(),
+            }
+        }
+        else if self.kind.is_v2() {
             buf[0] = 0x02;
             buf[1] = 0x07;
             buf[2] = key;
