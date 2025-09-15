@@ -205,6 +205,10 @@ impl StreamDeck {
 
     /// Reset the connected device
     pub fn reset(&mut self) -> Result<(), Error> {
+        // Module devices does not support reset command
+        if self.kind().is_module() {
+            return Ok(());
+        }
         let mut cmd = [0u8; 17];
 
         if self.kind.is_v2() {
@@ -220,19 +224,32 @@ impl StreamDeck {
 
     /// Set the device display brightness (in percent)
     pub fn set_brightness(&mut self, brightness: u8) -> Result<(), Error> {
-        let mut cmd = [0u8; 17];
+        if self.kind().is_module() {
+            let mut cmd = [0u8; 32];
+            let brightness = brightness.min(100);
 
-        let brightness = brightness.min(100);
+            if self.kind == Kind::Module6Keys {
+                cmd[..6].copy_from_slice(&[0x05, 0x55, 0xAA, 0xD1, 0x01, brightness]);
+            } else {
+                cmd[..3].copy_from_slice(&[0x03, 0x08, brightness]);
+            }
 
-        if self.kind.is_v2() {
-            cmd[..3].copy_from_slice(&[0x03, 0x08, brightness]);
+            self.device.send_feature_report(&cmd)?;
+            return Ok(());
         } else {
-            cmd[..6].copy_from_slice(&[0x05, 0x55, 0xaa, 0xd1, 0x01, brightness]);
+            let mut cmd = [0u8; 17];
+
+            let brightness = brightness.min(100);
+
+            if self.kind.is_v2() {
+                cmd[..3].copy_from_slice(&[0x03, 0x08, brightness]);
+            } else {
+                cmd[..6].copy_from_slice(&[0x05, 0x55, 0xaa, 0xd1, 0x01, brightness]);
+            }
+
+            self.device.send_feature_report(&cmd)?;
+            return Ok(());
         }
-
-        self.device.send_feature_report(&cmd)?;
-
-        Ok(())
     }
 
     /// Set blocking mode
