@@ -357,30 +357,42 @@ impl StreamDeck {
 
     /// Set a button to the provided RGB colour
     pub fn set_button_rgb(&mut self, key: u8, colour: &Colour) -> Result<(), Error> {
-        let mut image = vec![0u8; self.kind.image_size_bytes()];
-        let colour_order = self.kind.image_colour_order();
+        match self.kind {
+            // Module 15/32Keys supports setting colour directly
+            Kind::Module15Keys | Kind::Module32Keys => {
+                let mut cmd = [0u8; 32];
+                cmd[..6].copy_from_slice(&[0x03, 0x06, key, colour.r, colour.g, colour.b]);
+                self.device.send_feature_report(&cmd)?;
+                Ok(())
+            }
+            // Other models
+            _ => {
+                let mut image = vec![0u8; self.kind.image_size_bytes()];
+                let colour_order = self.kind.image_colour_order();
 
-        for i in 0..image.len() {
-            match i % 3 {
-                0 => {
-                    image[i] = match colour_order {
-                        ColourOrder::BGR => colour.b,
-                        ColourOrder::RGB => colour.r,
-                    }
+                for i in 0..image.len() {
+                    match i % 3 {
+                        0 => {
+                            image[i] = match colour_order {
+                                ColourOrder::BGR => colour.b,
+                                ColourOrder::RGB => colour.r,
+                            }
+                        }
+                        1 => image[i] = colour.g,
+                        2 => {
+                            image[i] = match colour_order {
+                                ColourOrder::BGR => colour.r,
+                                ColourOrder::RGB => colour.b,
+                            }
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                1 => image[i] = colour.g,
-                2 => {
-                    image[i] = match colour_order {
-                        ColourOrder::BGR => colour.r,
-                        ColourOrder::RGB => colour.b,
-                    }
-                }
-                _ => unreachable!(),
-            };
+                self.write_button_image(key, &self.convert_image(image)?)?;
+
+                Ok(())
+            }
         }
-        self.write_button_image(key, &self.convert_image(image)?)?;
-
-        Ok(())
     }
 
     /// Set a button to the provided image
