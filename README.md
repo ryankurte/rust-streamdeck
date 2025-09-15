@@ -29,6 +29,9 @@ Features:
   - [x] Stream Deck Original (untested)
   - [x] Stream Deck Original V2
   - [x] Stream Deck XL
+  - [x] Stream Deck Module 6Keys
+  - [x] Stream Deck Module 15Keys
+  - [x] Stream Deck Module 32Keys (untested)
 
 
 ## Getting started
@@ -50,8 +53,8 @@ Building requires `libusb` and `hidapi` packages.
 `streamdeck-cli --help` displays available subcommands and options, passing `--help` to subcommands (ie. `streamdeck set-image --help`) displays options for that subcommand
 
 ```
-streamdeck-cli 0.4.1
-A CLI for the Elgato StreamDeck
+streamdeck-cli 0.9.0
+Helper object for filtering device connections
 
 USAGE:
     streamdeck-cli [OPTIONS] <SUBCOMMAND>
@@ -69,10 +72,11 @@ OPTIONS:
 SUBCOMMANDS:
     get-buttons       Fetch button states
     help              Prints this message or the help of the given subcommand(s)
+    probe             Search for connected streamdecks
     reset             Reset the attached device
     set-brightness    Set device display brightness
-    set-colour        Set button colours
-    set-image         Set button images
+    set-colour        Simple Colour object for re-writing backgrounds etc
+    set-image         Options for image loading and editing
     version           Fetch the device firmware version
 
 ```

@@ -96,6 +96,9 @@ pub mod pids {
     pub const MK2: u16 = 0x0080;
     pub const REVISED_MINI: u16 = 0x0090;
     pub const PLUS: u16 = 0x0084;
+    pub const MODULE_6_KEYS: u16 = 0x00B8;
+    pub const MODULE_15_KEYS: u16 = 0x00B9;
+    pub const MODULE_32_KEYS: u16 = 0x00BA;
 }
 
 impl StreamDeck {
@@ -123,6 +126,10 @@ impl StreamDeck {
             pids::MK2 => Kind::Mk2,
             pids::REVISED_MINI => Kind::RevisedMini,
             pids::PLUS => Kind::Plus,
+
+            pids::MODULE_6_KEYS => Kind::Module6Keys,
+            pids::MODULE_15_KEYS => Kind::Module15Keys,
+            pids::MODULE_32_KEYS => Kind::Module32Keys,
 
             _ => return Err(Error::UnrecognisedPID),
         };
@@ -167,13 +174,33 @@ impl StreamDeck {
 
     /// Fetch the device firmware version
     pub fn version(&mut self) -> Result<String, Error> {
-        let mut buff = [0u8; 17];
-        buff[0] = if self.kind.is_v2() { 0x05 } else { 0x04 };
+        if self.kind().is_module() {
+            // Module devices
+            let mut buff = [0u8; 32];
+            buff[0] = if self.kind == Kind::Module6Keys {
+                0xA1 // 0xA0:LD / 0xA1:AP2(Primary Firmware) / 0xA2:AP1(Backup Firmware)
+            } else {
+                0x05 // 0x04:LD / 0x05:AP2(Primary Firmware) / 0x06:AP1(Backup Firmware)
+            };
 
-        let _s = self.device.get_feature_report(&mut buff)?;
+            let _s = self.device.get_feature_report(&mut buff)?;
 
-        let offset = if self.kind.is_v2() { 6 } else { 5 };
-        Ok(std::str::from_utf8(&buff[offset..]).unwrap().to_string())
+            let offset = 6;
+            Ok(std::str::from_utf8(&buff[offset..]).unwrap().to_string())
+        } else {
+            // Non-module devices
+            let mut buff = [0u8; 17];
+            buff[0] = if self.kind.is_v2() {
+                0x05
+            } else {
+                0x04
+            };
+
+            let _s = self.device.get_feature_report(&mut buff)?;
+
+            let offset = if self.kind.is_v2() { 6 } else { 5 };
+            Ok(std::str::from_utf8(&buff[offset..]).unwrap().to_string())
+        }
     }
 
     /// Reset the connected device
@@ -233,6 +260,9 @@ impl StreamDeck {
                     pids::ORIGINAL => Ok((Kind::Original, pids::ORIGINAL)),
                     pids::MINI => Ok((Kind::Mini, pids::MINI)),
                     pids::PLUS => Ok((Kind::Plus, pids::PLUS)),
+                    pids::MODULE_6_KEYS => Ok((Kind::Module6Keys, pids::MODULE_6_KEYS)),
+                    pids::MODULE_15_KEYS => Ok((Kind::Module15Keys, pids::MODULE_15_KEYS)),
+                    pids::MODULE_32_KEYS => Ok((Kind::Module32Keys, pids::MODULE_32_KEYS)),
                     _ => Err(Error::UnrecognisedPID)
                 };
                 available_devices.push(deck);
