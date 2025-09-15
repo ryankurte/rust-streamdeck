@@ -74,8 +74,8 @@ impl Kind {
             Kind::Xl => 3,
             Kind::Plus => 3,
             Kind::Module6Keys => 1,
-            Kind::Module15Keys => 4,
-            Kind::Module32Keys => 4,
+            Kind::Module15Keys => 3,
+            Kind::Module32Keys => 3,
         }
     }
 
