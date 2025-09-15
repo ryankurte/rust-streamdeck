@@ -180,7 +180,7 @@ impl StreamDeck {
             buff[0] = if self.kind == Kind::Module6Keys {
                 0xA1 // 0xA0:LD / 0xA1:AP2(Primary Firmware) / 0xA2:AP1(Backup Firmware)
             } else {
-                0x05 // 0x04:LD / 0x05:AP2(Primary Firmware) / 0x06:AP1(Backup Firmware)
+                0x05 // 0x04:LD / 0x05:AP2(Primary Firmware) / 0x07:AP1(Backup Firmware)
             };
 
             let _s = self.device.get_feature_report(&mut buff)?;
