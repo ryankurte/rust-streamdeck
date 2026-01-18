@@ -68,6 +68,8 @@ pub enum Error {
     UnsupportedInput,
     #[error("no data")]
     NoData,
+    #[error("command not supported on this device")]
+    UnsupportedCommand,
 }
 
 pub struct DeviceImage {
@@ -204,10 +206,12 @@ impl StreamDeck {
     }
 
     /// Reset the connected device
+    ///
+    /// Note: This command is not supported on Stream Deck Module devices
+    /// (Module 6Keys, Module 15Keys, Module 32Keys).
     pub fn reset(&mut self) -> Result<(), Error> {
-        // Module devices does not support reset command
         if self.kind().is_module() {
-            return Ok(());
+            return Err(Error::UnsupportedCommand);
         }
         let mut cmd = [0u8; 17];
 
