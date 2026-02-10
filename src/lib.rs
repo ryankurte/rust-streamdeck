@@ -68,6 +68,8 @@ pub enum Error {
     UnsupportedInput,
     #[error("no data")]
     NoData,
+    #[error("command not supported on this device")]
+    UnsupportedCommand,
 }
 
 pub struct DeviceImage {
@@ -96,6 +98,9 @@ pub mod pids {
     pub const MK2: u16 = 0x0080;
     pub const REVISED_MINI: u16 = 0x0090;
     pub const PLUS: u16 = 0x0084;
+    pub const MODULE_6_KEYS: u16 = 0x00B8;
+    pub const MODULE_15_KEYS: u16 = 0x00B9;
+    pub const MODULE_32_KEYS: u16 = 0x00BA;
 }
 
 impl StreamDeck {
@@ -123,6 +128,10 @@ impl StreamDeck {
             pids::MK2 => Kind::Mk2,
             pids::REVISED_MINI => Kind::RevisedMini,
             pids::PLUS => Kind::Plus,
+
+            pids::MODULE_6_KEYS => Kind::Module6Keys,
+            pids::MODULE_15_KEYS => Kind::Module15Keys,
+            pids::MODULE_32_KEYS => Kind::Module32Keys,
 
             _ => return Err(Error::UnrecognisedPID),
         };
@@ -167,17 +176,43 @@ impl StreamDeck {
 
     /// Fetch the device firmware version
     pub fn version(&mut self) -> Result<String, Error> {
-        let mut buff = [0u8; 17];
-        buff[0] = if self.kind.is_v2() { 0x05 } else { 0x04 };
+        if self.kind().is_module() {
+            // Module devices
+            let mut buff = [0u8; 32];
+            buff[0] = if self.kind == Kind::Module6Keys {
+                0xA1 // 0xA0:LD / 0xA1:AP2(Primary Firmware) / 0xA2:AP1(Backup Firmware)
+            } else {
+                0x05 // 0x04:LD / 0x05:AP2(Primary Firmware) / 0x07:AP1(Backup Firmware)
+            };
 
-        let _s = self.device.get_feature_report(&mut buff)?;
+            let _s = self.device.get_feature_report(&mut buff)?;
 
-        let offset = if self.kind.is_v2() { 6 } else { 5 };
-        Ok(std::str::from_utf8(&buff[offset..]).unwrap().to_string())
+            let offset = 6;
+            Ok(std::str::from_utf8(&buff[offset..]).unwrap().to_string())
+        } else {
+            // Non-module devices
+            let mut buff = [0u8; 17];
+            buff[0] = if self.kind.is_v2() {
+                0x05
+            } else {
+                0x04
+            };
+
+            let _s = self.device.get_feature_report(&mut buff)?;
+
+            let offset = if self.kind.is_v2() { 6 } else { 5 };
+            Ok(std::str::from_utf8(&buff[offset..]).unwrap().to_string())
+        }
     }
 
     /// Reset the connected device
+    ///
+    /// Note: This command is not supported on Stream Deck Module devices
+    /// (Module 6Keys, Module 15Keys, Module 32Keys).
     pub fn reset(&mut self) -> Result<(), Error> {
+        if self.kind().is_module() {
+            return Err(Error::UnsupportedCommand);
+        }
         let mut cmd = [0u8; 17];
 
         if self.kind.is_v2() {
@@ -193,19 +228,32 @@ impl StreamDeck {
 
     /// Set the device display brightness (in percent)
     pub fn set_brightness(&mut self, brightness: u8) -> Result<(), Error> {
-        let mut cmd = [0u8; 17];
+        if self.kind().is_module() {
+            let mut cmd = [0u8; 32];
+            let brightness = brightness.min(100);
 
-        let brightness = brightness.min(100);
+            if self.kind == Kind::Module6Keys {
+                cmd[..6].copy_from_slice(&[0x05, 0x55, 0xAA, 0xD1, 0x01, brightness]);
+            } else {
+                cmd[..3].copy_from_slice(&[0x03, 0x08, brightness]);
+            }
 
-        if self.kind.is_v2() {
-            cmd[..3].copy_from_slice(&[0x03, 0x08, brightness]);
+            self.device.send_feature_report(&cmd)?;
+            return Ok(());
         } else {
-            cmd[..6].copy_from_slice(&[0x05, 0x55, 0xaa, 0xd1, 0x01, brightness]);
+            let mut cmd = [0u8; 17];
+
+            let brightness = brightness.min(100);
+
+            if self.kind.is_v2() {
+                cmd[..3].copy_from_slice(&[0x03, 0x08, brightness]);
+            } else {
+                cmd[..6].copy_from_slice(&[0x05, 0x55, 0xaa, 0xd1, 0x01, brightness]);
+            }
+
+            self.device.send_feature_report(&cmd)?;
+            return Ok(());
         }
-
-        self.device.send_feature_report(&cmd)?;
-
-        Ok(())
     }
 
     /// Set blocking mode
@@ -233,6 +281,9 @@ impl StreamDeck {
                     pids::ORIGINAL => Ok((Kind::Original, pids::ORIGINAL)),
                     pids::MINI => Ok((Kind::Mini, pids::MINI)),
                     pids::PLUS => Ok((Kind::Plus, pids::PLUS)),
+                    pids::MODULE_6_KEYS => Ok((Kind::Module6Keys, pids::MODULE_6_KEYS)),
+                    pids::MODULE_15_KEYS => Ok((Kind::Module15Keys, pids::MODULE_15_KEYS)),
+                    pids::MODULE_32_KEYS => Ok((Kind::Module32Keys, pids::MODULE_32_KEYS)),
                     _ => Err(Error::UnrecognisedPID)
                 };
                 available_devices.push(deck);
@@ -310,30 +361,42 @@ impl StreamDeck {
 
     /// Set a button to the provided RGB colour
     pub fn set_button_rgb(&mut self, key: u8, colour: &Colour) -> Result<(), Error> {
-        let mut image = vec![0u8; self.kind.image_size_bytes()];
-        let colour_order = self.kind.image_colour_order();
+        match self.kind {
+            // Module 15/32Keys supports setting colour directly
+            Kind::Module15Keys | Kind::Module32Keys => {
+                let mut cmd = [0u8; 32];
+                cmd[..6].copy_from_slice(&[0x03, 0x06, key, colour.r, colour.g, colour.b]);
+                self.device.send_feature_report(&cmd)?;
+                Ok(())
+            }
+            // Other models
+            _ => {
+                let mut image = vec![0u8; self.kind.image_size_bytes()];
+                let colour_order = self.kind.image_colour_order();
 
-        for i in 0..image.len() {
-            match i % 3 {
-                0 => {
-                    image[i] = match colour_order {
-                        ColourOrder::BGR => colour.b,
-                        ColourOrder::RGB => colour.r,
-                    }
+                for i in 0..image.len() {
+                    match i % 3 {
+                        0 => {
+                            image[i] = match colour_order {
+                                ColourOrder::BGR => colour.b,
+                                ColourOrder::RGB => colour.r,
+                            }
+                        }
+                        1 => image[i] = colour.g,
+                        2 => {
+                            image[i] = match colour_order {
+                                ColourOrder::BGR => colour.r,
+                                ColourOrder::RGB => colour.b,
+                            }
+                        }
+                        _ => unreachable!(),
+                    };
                 }
-                1 => image[i] = colour.g,
-                2 => {
-                    image[i] = match colour_order {
-                        ColourOrder::BGR => colour.r,
-                        ColourOrder::RGB => colour.b,
-                    }
-                }
-                _ => unreachable!(),
-            };
+                self.write_button_image(key, &self.convert_image(image)?)?;
+
+                Ok(())
+            }
         }
-        self.write_button_image(key, &self.convert_image(image)?)?;
-
-        Ok(())
     }
 
     /// Set a button to the provided image
@@ -498,7 +561,32 @@ impl StreamDeck {
         is_last: bool,
         payload_len: usize,
     ) {
-        if self.kind.is_v2() {
+        if self.kind.is_module() {
+            match self.kind {
+                // https://docs.elgato.com/streamdeck/hid/module-6/#upload-data-to-image-memory-bank
+                Kind::Module6Keys => {
+                    buf[0] = 0x02; // ReportID
+                    buf[1] = 0x01; // Command
+                    buf[2] = sequence as u8; // Chunk Index
+                    buf[3] = 0x00; // Reserved
+                    buf[4] = if is_last { 0x01 } else { 0x00 }; // Show Image flag
+                    buf[5] = key;
+                    buf[6..10].copy_from_slice(&[0x00,0x00,0x00,0x00]);
+                }
+                // https://docs.elgato.com/streamdeck/hid/module-15_32#output-reports
+                // basically same as v2
+                Kind::Module15Keys | Kind::Module32Keys => {
+                    buf[0] = 0x02; // Report ID
+                    buf[1] = 0x07; // Command
+                    buf[2] = key; // Key Index
+                    buf[3] = if is_last { 1 } else { 0 }; // Transfer is Done flag (0x01 = last chunk)
+                    buf[4..6].copy_from_slice(&(payload_len as u16).to_le_bytes()); // Chunk Contents Size
+                    buf[6..8].copy_from_slice(&sequence.to_le_bytes()); // Chunk Index (zero-based)
+                }
+                _ => unreachable!(),
+            }
+        }
+        else if self.kind.is_v2() {
             buf[0] = 0x02;
             buf[1] = 0x07;
             buf[2] = key;

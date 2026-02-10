@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use image::codecs::jpeg::JpegEncoder;
-use image::io::Reader;
+use image::ImageReader;
 use image::{imageops::FilterType, Pixel, Rgba};
 use image::{DynamicImage, ExtendedColorType};
 
@@ -102,7 +102,7 @@ pub(crate) fn load_image(
     colour_order: ColourOrder,
 ) -> Result<Vec<u8>, Error> {
     // Open image reader
-    let reader = match Reader::open(path) {
+    let reader = match ImageReader::open(path) {
         Ok(v) => v,
         Err(e) => {
             error!("error loading file '{}': {:?}", path, e);

@@ -8,6 +8,9 @@ pub enum Kind {
     Xl,
     Mk2,
     Plus,
+    Module6Keys,
+    Module15Keys,
+    Module32Keys,
 }
 
 /// Stream Deck key layout direction
@@ -56,6 +59,9 @@ impl Kind {
             Kind::Mini | Kind::RevisedMini => 6,
             Kind::Xl => 32,
             Kind::Plus => 8,
+            Kind::Module6Keys => 6,
+            Kind::Module15Keys => 15,
+            Kind::Module32Keys => 32,
         }
     }
 
@@ -67,6 +73,9 @@ impl Kind {
             Kind::Mini | Kind::RevisedMini => 0,
             Kind::Xl => 3,
             Kind::Plus => 3,
+            Kind::Module6Keys => 1,
+            Kind::Module15Keys => 3,
+            Kind::Module32Keys => 3,
         }
     }
 
@@ -86,32 +95,33 @@ impl Kind {
 
     pub(crate) fn key_columns(&self) -> u8 {
         match self {
-            Kind::Mini | Kind::RevisedMini => 3,
-            Kind::Original | Kind::OriginalV2 | Kind::Mk2 => 5,
-            Kind::Xl => 8,
+            Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => 3,
+            Kind::Original | Kind::OriginalV2 | Kind::Mk2 | Kind::Module15Keys => 5,
+            Kind::Xl | Kind::Module32Keys => 8,
             Kind::Plus => 4,
         }
     }
 
     pub fn image_mode(&self) -> ImageMode {
         match self {
-            Kind::Original | Kind::Mini | Kind::RevisedMini => ImageMode::Bmp,
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus => ImageMode::Jpeg,
+            Kind::Original | Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => ImageMode::Bmp,
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys => ImageMode::Jpeg,
         }
     }
 
     pub fn image_size(&self) -> (usize, usize) {
         match self {
-            Kind::Original | Kind::OriginalV2 | Kind::Mk2 => (72, 72),
-            Kind::Mini | Kind::RevisedMini => (80, 80),
-            Kind::Xl => (96, 96),
+            Kind::Original | Kind::OriginalV2 | Kind::Mk2 | Kind::Module15Keys => (72, 72),
+            Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => (80, 80),
+            Kind::Xl | Kind::Module32Keys => (96, 96),
             Kind::Plus => (120, 120),
         }
     }
 
     pub fn image_rotation(&self) -> Rotation {
         match self {
-            Kind::Mini | Kind::RevisedMini => Rotation::Rot270,
+            Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => Rotation::Rot270,
+            Kind::Module15Keys | Kind::Module32Keys => Rotation::Rot180,
             _ => Rotation::Rot0,
         }
     }
@@ -119,7 +129,7 @@ impl Kind {
     pub fn image_mirror(&self) -> Mirroring {
         match self {
             // Mini has rotation, not mirror
-            Kind::Mini | Kind::RevisedMini | Kind::Plus => Mirroring::None,
+            Kind::Mini | Kind::RevisedMini | Kind::Plus | Kind::Module6Keys | Kind::Module15Keys | Kind::Module32Keys => Mirroring::None,
             // On the original the image is flipped across the Y axis
             Kind::Original => Mirroring::Y,
             // On the V2 devices, both X and Y need to flip
@@ -141,8 +151,8 @@ impl Kind {
 
     pub(crate) fn image_report_header_len(&self) -> usize {
         match self {
-            Kind::Original | Kind::Mini | Kind::RevisedMini => 16,
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus => 8,
+            Kind::Original | Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => 16,
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys => 8
         }
     }
 
@@ -150,22 +160,29 @@ impl Kind {
         match self {
             // BMP headers for the original and mini
             Kind::Original => &ORIGINAL_IMAGE_BASE,
-            Kind::Mini | Kind::RevisedMini => &MINI_IMAGE_BASE,
+            Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => &MINI_IMAGE_BASE,
 
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus => &[],
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys => &[],
         }
     }
 
     pub(crate) fn image_colour_order(&self) -> ColourOrder {
         match self {
-            Kind::Original | Kind::Mini | Kind::RevisedMini => ColourOrder::BGR,
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus => ColourOrder::RGB,
+            Kind::Original | Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => ColourOrder::BGR,
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys => ColourOrder::RGB,
         }
     }
 
     pub(crate) fn is_v2(&self) -> bool {
         match self {
             Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_module(&self) -> bool {
+        match self {
+            Kind::Module6Keys | Kind::Module15Keys | Kind::Module32Keys => true,
             _ => false,
         }
     }
