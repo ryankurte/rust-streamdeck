@@ -10,16 +10,16 @@ use crate::{rgb_to_bgr, Error};
 
 /// Simple Colour object for re-writing backgrounds etc.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "structopt", derive(structopt::StructOpt))]
+#[cfg_attr(feature = "clap", derive(clap::Args))]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Colour {
-    #[cfg_attr(feature = "structopt", structopt(long))]
+    #[cfg_attr(feature = "clap", arg(long))]
     pub r: u8,
 
-    #[cfg_attr(feature = "structopt", structopt(long))]
+    #[cfg_attr(feature = "clap", arg(long))]
     pub g: u8,
 
-    #[cfg_attr(feature = "structopt", structopt(long))]
+    #[cfg_attr(feature = "clap", arg(long))]
     pub b: u8,
 }
 
@@ -44,14 +44,14 @@ impl FromStr for Colour {
 
 /// Options for image loading and editing
 #[derive(Debug)]
-#[cfg_attr(feature = "structopt", derive(structopt::StructOpt))]
+#[cfg_attr(feature = "clap", derive(clap::Args))]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ImageOptions {
-    #[cfg_attr(feature = "structopt", structopt(long = "bg"))]
+    #[cfg_attr(feature = "clap", arg(long = "bg"))]
     /// Background colour
     background: Option<Colour>,
 
-    #[cfg_attr(feature = "structopt", structopt(long))]
+    #[cfg_attr(feature = "clap", arg(long))]
     /// Invert colours
     invert: bool,
 }
