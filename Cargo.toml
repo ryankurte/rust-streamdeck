@@ -10,6 +10,7 @@ edition = "2018"
 
 [features]
 util = [ "structopt", "simplelog", "humantime" ]
+input-manager = []
 default = [ "util" ]
 
 [dependencies]

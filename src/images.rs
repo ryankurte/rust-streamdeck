@@ -1,9 +1,8 @@
 use std::str::FromStr;
 
 use image::codecs::jpeg::JpegEncoder;
-use image::ImageReader;
 use image::{imageops::FilterType, Pixel, Rgba};
-use image::{DynamicImage, ExtendedColorType};
+use image::{DynamicImage, ExtendedColorType, ImageReader};
 
 use crate::info::{ColourOrder, Mirroring, Rotation};
 use crate::{rgb_to_bgr, Error};
