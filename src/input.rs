@@ -219,7 +219,7 @@ impl InputManager {
 
         // Remove released buttons from the pressed_keys HashSet and add them to the events Vec as released
         self.pressed_keys.retain(|button| {
-            if cmd[offset + *button as usize] == 0 && !fresh_presses.contains(button) {
+            if cmd[offset + 1 + *button as usize] == 0 && !fresh_presses.contains(button) {
                 events.push(InputEvent::Button {
                     index: *button,
                     action: ButtonAction::Released,
