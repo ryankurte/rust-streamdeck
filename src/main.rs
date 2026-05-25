@@ -105,12 +105,12 @@ fn main() {
             opts.filter.vid, opts.filter.pid, serial);
 
     // Run the command
-    if let Err(e) = do_command(&mut deck, opts.cmd) {
+    if let Err(e) = do_command(deck, opts.cmd) {
         error!("Command error: {:?}", e);
     }
 }
 
-fn do_command(deck: &mut StreamDeck, cmd: Commands) -> Result<(), Error> {
+fn do_command(mut deck: StreamDeck, cmd: Commands) -> Result<(), Error> {
     match cmd {
         Commands::Reset => {
             deck.reset()?;

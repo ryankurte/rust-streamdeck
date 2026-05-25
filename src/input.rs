@@ -64,14 +64,14 @@ pub enum DialAction {
 }
 
 ///Manages inputs for the Streamdeck device. Keeps track of pressed keys and dials and touchscreens and generates InputEvents
-pub struct InputManager<'a> {
-    deck: &'a mut StreamDeck,
+pub struct InputManager {
+    deck: StreamDeck,
     pressed_keys: HashSet<u8>,
     pressed_dials: HashSet<usize>,
 }
 
-impl <'a> InputManager<'a> {
-    pub fn new(deck: &'a mut StreamDeck) -> Self {
+impl InputManager {
+    pub fn new(deck: StreamDeck) -> Self {
         InputManager {
             deck,
             pressed_keys: HashSet::new(),
