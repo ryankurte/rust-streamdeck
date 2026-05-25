@@ -19,7 +19,9 @@ pub mod info;
 pub use info::*;
 pub use info::Kind;
 
+#[cfg(feature = "input-manager")]
 pub mod input;
+#[cfg(feature = "input-manager")]
 pub use input::*;
 
 use imageproc::drawing::draw_text_mut;
@@ -298,7 +300,8 @@ impl StreamDeck {
 
     /// Read input from the device
     /// 
-    /// This is a raw read of the device input and is not recommended for general use.
+    /// This is a raw read of the device input intended for the input managerand is not recommended for general use.
+    #[cfg(feature = "input-manager")]
     pub fn read_input(&mut self, timeout: Option<Duration>) -> Result<[u8; 36], Error> {
         let mut cmd = [0u8; 36];
         
@@ -333,14 +336,12 @@ impl StreamDeck {
             return Err(Error::NoData);
         }
 
-        if self.kind == Kind::Plus {
-            //If the second byte on SD Plus is not 0, a dial or the touchscreen was used, we don't support that here
-            //This would write to indices which represent buttons here and thus create faulty output
-            if cmd[1] != 0 {
-                return Err(Error::UnsupportedInput);
-            }
+        // If the second byte on SD Plus is not 0, a dial or the touchscreen was used, we don't support that here.
+        // This would write to indices which represent buttons here and thus create faulty output
+        if self.kind == Kind::Plus && cmd[1] != 0 {
+             return Err(Error::UnsupportedInput);
         }
-
+        
         let mut out = vec![0u8; keys];
 
         match self.kind.key_direction() {

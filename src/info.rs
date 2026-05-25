@@ -55,6 +55,7 @@ pub enum Mirroring {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg(feature = "input-manager")]
 pub(crate) struct TouchDataIndices {
     pub event_type_index: usize,
     pub x_low: usize,
@@ -118,7 +119,7 @@ impl Kind {
         }
     }
 
-
+    #[cfg(feature = "input-manager")]
     pub(crate) fn dials(&self) -> u8 {
         match self {
             Kind::Plus => 4,
@@ -126,6 +127,7 @@ impl Kind {
         }
     }
 
+    #[cfg(feature = "input-manager")]
     pub(crate) fn dial_data_offset(&self) -> usize {
         match self {
             Kind::Plus => 5,
@@ -133,6 +135,7 @@ impl Kind {
         }
     }
 
+    #[cfg(feature = "input-manager")]
     pub(crate) fn dial_press_flag_index(&self) -> usize {
         match self {
             Kind::Plus => 4,
@@ -217,7 +220,8 @@ impl Kind {
             _ => false,
         }
     }
-    
+
+    #[cfg(feature = "input-manager")]
     pub(crate) fn touch_data_indices(&self) -> Option<TouchDataIndices> {
         match self {
             Kind::Plus => Some(TouchDataIndices {

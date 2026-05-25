@@ -9,7 +9,9 @@ use structopt::StructOpt;
 extern crate humantime;
 use humantime::Duration;
 
-pub use streamdeck::{info, Colour, Error, Filter, ImageOptions, InputEvent, InputManager, Kind, StreamDeck};
+pub use streamdeck::{info, Colour, Error, Filter, ImageOptions, Kind, StreamDeck};
+#[cfg(feature = "input-manager")]
+pub use streamdeck::{InputEvent, InputManager};
 
 
 
@@ -49,6 +51,7 @@ pub enum Commands {
         /// Read continuously
         continuous: bool,
     },
+    #[cfg(feature = "input-manager")]
     /// Fetch input events
     GetInput {
         #[structopt(long)]
@@ -132,6 +135,7 @@ fn do_command(mut deck: StreamDeck, cmd: Commands) -> Result<(), Error> {
                 }
             }
         },
+        #[cfg(feature = "input-manager")]
         Commands::GetInput {
             timeout,
             continuous,
