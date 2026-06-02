@@ -1,4 +1,6 @@
 use std::io::Error as IoError;
+use std::convert::TryFrom;
+use std::thread;
 use std::time::Duration;
 
 #[macro_use]
@@ -29,18 +31,18 @@ pub struct StreamDeck {
 }
 
 /// Helper object for filtering device connections
-#[cfg(feature = "structopt")]
-#[derive(structopt::StructOpt)]
+#[cfg(feature = "clap")]
+#[derive(clap::Args)]
 pub struct Filter {
-    #[structopt(long, default_value="0fd9", parse(try_from_str=u16_parse_hex), env="USB_VID")]
+    #[arg(long, default_value = "0fd9", value_parser = u16_parse_hex, env = "USB_VID")]
     /// USB Device Vendor ID (VID) in hex
     pub vid: u16,
 
-    #[structopt(long, default_value="0063", parse(try_from_str=u16_parse_hex), env="USB_PID")]
+    #[arg(long, default_value = "0063", value_parser = u16_parse_hex, env = "USB_PID")]
     /// USB Device Product ID (PID) in hex
     pub pid: u16,
 
-    #[structopt(long, env = "USB_SERIAL")]
+    #[arg(long, env = "USB_SERIAL")]
     /// USB Device Serial
     pub serial: Option<String>,
 }
@@ -70,7 +72,41 @@ pub enum Error {
     NoData,
     #[error("command not supported on this device")]
     UnsupportedCommand,
+    #[error("image is too large for protocol header")]
+    ImageTooLarge,
+    #[error("incomplete HID write: {actual}/{expected} bytes transferred")]
+    PartialWrite { expected: usize, actual: usize },
 }
+
+/// Ajazz/GK150K clear command target.
+pub enum ClearTarget {
+    /// Clear one zero-indexed logical key.
+    Single(u8),
+    /// Clear all keys.
+    All,
+    /// Clear all keys and show the device logo.
+    AllWithLogo,
+}
+
+/// Input events reported by event-based devices.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum InputEvent {
+    /// A zero-indexed logical key was released.
+    ButtonReleased(u8),
+    /// A device acknowledgement was received.
+    Ack,
+    /// The report was not recognised.
+    Unknown,
+}
+
+const AJAZZ_PACKET_SIZE: usize = 512;
+const AJAZZ_INTER_CHUNK_DELAY: Duration = Duration::from_millis(5);
+const AJAZZ_ACK_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
+const AJAZZ_INPUT_MIN_LEN: usize = 10;
+const AJAZZ_USER_TO_DEVICE: [u8; 18] = [
+    0x0d, 0x0a, 0x07, 0x04, 0x01, 0x0e, 0x0b, 0x08, 0x05, 0x02, 0x0f, 0x0c, 0x09, 0x06, 0x03,
+    0x10, 0x11, 0x12,
+];
 
 pub struct DeviceImage {
     data: Vec<u8>,
@@ -101,6 +137,15 @@ pub mod pids {
     pub const MODULE_6_KEYS: u16 = 0x00B8;
     pub const MODULE_15_KEYS: u16 = 0x00B9;
     pub const MODULE_32_KEYS: u16 = 0x00BA;
+    pub const AJAZZ_AKP153: u16 = 0x1125;
+    pub const GK150K: u16 = 0x1000;
+}
+
+/// Device USB Vendor Identifiers (VIDs).
+pub mod vids {
+    pub const ELGATO: u16 = 0x0fd9;
+    pub const AJAZZ: u16 = 0x260d;
+    pub const GK150K: u16 = 0x0c00;
 }
 
 impl StreamDeck {
@@ -132,6 +177,7 @@ impl StreamDeck {
             pids::MODULE_6_KEYS => Kind::Module6Keys,
             pids::MODULE_15_KEYS => Kind::Module15Keys,
             pids::MODULE_32_KEYS => Kind::Module32Keys,
+            pids::AJAZZ_AKP153 | pids::GK150K => Kind::AjazzAkp153,
 
             _ => return Err(Error::UnrecognisedPID),
         };
@@ -176,6 +222,16 @@ impl StreamDeck {
 
     /// Fetch the device firmware version
     pub fn version(&mut self) -> Result<String, Error> {
+        if self.kind().is_ajazz() {
+            let mut buff = [0u8; 256];
+            buff[0] = 0x01;
+            let size = self.device.get_feature_report(&mut buff)?;
+            return Ok(String::from_utf8_lossy(&buff[1..size])
+                .trim_matches(char::from(0))
+                .trim()
+                .to_owned());
+        }
+
         if self.kind().is_module() {
             // Module devices
             let mut buff = [0u8; 32];
@@ -210,6 +266,10 @@ impl StreamDeck {
     /// Note: This command is not supported on Stream Deck Module devices
     /// (Module 6Keys, Module 15Keys, Module 32Keys).
     pub fn reset(&mut self) -> Result<(), Error> {
+        if self.kind().is_ajazz() {
+            return self.clear(ClearTarget::AllWithLogo);
+        }
+
         if self.kind().is_module() {
             return Err(Error::UnsupportedCommand);
         }
@@ -228,6 +288,13 @@ impl StreamDeck {
 
     /// Set the device display brightness (in percent)
     pub fn set_brightness(&mut self, brightness: u8) -> Result<(), Error> {
+        if self.kind().is_ajazz() {
+            let mut cmd = [0u8; AJAZZ_PACKET_SIZE];
+            cmd[..10].copy_from_slice(b"CRT\0\0LIG\0\0");
+            cmd[10] = brightness.min(100);
+            return self.write_ajazz_packet(&cmd);
+        }
+
         if self.kind().is_module() {
             let mut cmd = [0u8; 32];
             let brightness = brightness.min(100);
@@ -273,7 +340,7 @@ impl StreamDeck {
         let api = HidApi::new()?;
         let mut available_devices = vec![];
         for device in api.device_list() {
-            if device.vendor_id() == 0x0fd9 {
+            if device.vendor_id() == vids::ELGATO {
                 let deck = match device.product_id() {
                     pids::MK2 => Ok((Kind::Mk2, pids::MK2)),
                     pids::XL => Ok((Kind::Xl, pids::XL)),
@@ -287,6 +354,12 @@ impl StreamDeck {
                     _ => Err(Error::UnrecognisedPID)
                 };
                 available_devices.push(deck);
+            } else if matches!(device.vendor_id(), vids::AJAZZ | vids::GK150K) {
+                let deck = match device.product_id() {
+                    pids::AJAZZ_AKP153 | pids::GK150K => Ok((Kind::AjazzAkp153, device.product_id())),
+                    _ => Err(Error::UnrecognisedPID),
+                };
+                available_devices.push(deck);
             }
         }
         Ok(available_devices)
@@ -298,6 +371,10 @@ impl StreamDeck {
     /// (or the specified timeout has elapsed). In non-blocking mode this will return
     /// immediately with a zero vector if no data is available
     pub fn read_buttons(&mut self, timeout: Option<Duration>) -> Result<Vec<u8>, Error> {
+        if self.kind().is_ajazz() {
+            return Err(Error::UnsupportedCommand);
+        }
+
         let mut cmd = [0u8; 36];
         let keys = self.kind.keys() as usize;
         let offset = self.kind.key_data_offset();
@@ -470,6 +547,12 @@ impl StreamDeck {
         if key > self.kind.keys() {
             return Err(Error::InvalidKeyIndex);
         }
+        if self.kind().is_ajazz() {
+            return AJAZZ_USER_TO_DEVICE
+                .get(usize::from(key))
+                .copied()
+                .ok_or(Error::InvalidKeyIndex);
+        }
         let mapped = match self.kind.key_direction() {
             // All but the original Streamdeck already have correct coordinates
             KeyDirection::LeftToRight => key + self.kind.key_index_offset(),
@@ -490,8 +573,12 @@ impl StreamDeck {
         let image = &image.data;
         let key = self.translate_key_index(key)?;
 
+        if self.kind().is_ajazz() {
+            return self.write_ajazz_image(key, image);
+        }
+
         let mut buf = vec![0u8; self.kind.image_report_len()];
-        let base = self.kind.image_base();
+        let base = self.kind.image_base().to_vec();
         let hdrlen = self.kind.image_report_header_len();
 
         match self.kind {
@@ -500,14 +587,14 @@ impl StreamDeck {
                 // later versions. First packet contains the initial 7749 bytes.
                 self.write_image_header(&mut buf, key, 1, false, 0);
                 let start = hdrlen + base.len();
-                buf[hdrlen..start].copy_from_slice(base);
+                buf[hdrlen..start].copy_from_slice(&base);
                 buf[start..start + 7749].copy_from_slice(&image[0..7749]);
-                self.device.write(&buf)?;
+                self.write_checked(&buf)?;
 
                 // Second packet contains the last 7803 bytes
                 self.write_image_header(&mut buf, key, 2, true, 0);
                 buf[hdrlen..hdrlen + 7803].copy_from_slice(&image[7749..15552]);
-                self.device.write(&buf)?;
+                self.write_checked(&buf)?;
 
                 Ok(())
             }
@@ -523,7 +610,7 @@ impl StreamDeck {
 
                     if sequence == 0 && !base.is_empty() {
                         trace!("outputting base");
-                        buf[start..start + base.len()].copy_from_slice(base);
+                        buf[start..start + base.len()].copy_from_slice(&base);
                         // Recalculate take with the smaller room
                         take = (image.len() - offset).min(maxdatalen - base.len());
                         start += base.len();
@@ -542,7 +629,7 @@ impl StreamDeck {
                         sequence,
                         if is_last { " (last)" } else { "" },
                     );
-                    self.device.write(&buf)?;
+                    self.write_checked(&buf)?;
 
                     sequence += 1;
                     offset += take;
@@ -550,6 +637,129 @@ impl StreamDeck {
                 Ok(())
             }
         }
+    }
+
+    /// Clear an Ajazz/GK150K key or display target.
+    pub fn clear(&mut self, target: ClearTarget) -> Result<(), Error> {
+        if !self.kind().is_ajazz() {
+            return Err(Error::UnsupportedCommand);
+        }
+
+        let mut cmd = [0u8; AJAZZ_PACKET_SIZE];
+        cmd[..10].copy_from_slice(b"CRT\0\0CLE\0\0");
+        match target {
+            ClearTarget::Single(key) => {
+                cmd[10] = 0x00;
+                cmd[11] = self.translate_key_index(key)?;
+            }
+            ClearTarget::All => {
+                cmd[10] = 0x00;
+                cmd[11] = 0xff;
+            }
+            ClearTarget::AllWithLogo => {
+                cmd[10] = 0x44;
+                cmd[11] = 0x43;
+            }
+        }
+        self.write_ajazz_packet(&cmd)
+    }
+
+    /// Read an event from devices that report button releases instead of states.
+    pub fn read_input_event(&mut self, timeout: Duration) -> Result<Option<InputEvent>, Error> {
+        if !self.kind().is_ajazz() {
+            return Err(Error::UnsupportedCommand);
+        }
+
+        let mut buf = [0u8; AJAZZ_PACKET_SIZE];
+        let read = self
+            .device
+            .read_timeout(&mut buf, timeout.as_millis() as i32)?;
+        if read == 0 {
+            return Ok(None);
+        }
+        Ok(Some(parse_ajazz_input_report(read, &buf)))
+    }
+
+    fn write_ajazz_image(&mut self, key: u8, image: &[u8]) -> Result<(), Error> {
+        let image_size = u16::try_from(image.len()).map_err(|_| Error::ImageTooLarge)?;
+        let [size_high, size_low] = image_size.to_be_bytes();
+
+        let mut header = [0u8; AJAZZ_PACKET_SIZE];
+        header[..10].copy_from_slice(b"CRT\0\0BAT\0\0");
+        header[10] = size_high;
+        header[11] = size_low;
+        header[12] = key;
+        self.write_ajazz_packet(&header)?;
+        thread::sleep(AJAZZ_INTER_CHUNK_DELAY);
+
+        for chunk in image.chunks(AJAZZ_PACKET_SIZE) {
+            let mut packet = [0u8; AJAZZ_PACKET_SIZE];
+            packet[..chunk.len()].copy_from_slice(chunk);
+            self.write_ajazz_packet(&packet)?;
+            thread::sleep(AJAZZ_INTER_CHUNK_DELAY);
+        }
+
+        let mut flush = [0u8; AJAZZ_PACKET_SIZE];
+        flush[..8].copy_from_slice(b"CRT\0\0STP");
+        self.write_ajazz_packet(&flush)?;
+        let _ = self.drain_ajazz_ack(AJAZZ_ACK_DRAIN_TIMEOUT);
+        Ok(())
+    }
+
+    fn write_checked(&mut self, buf: &[u8]) -> Result<(), Error> {
+        let written = self.device.write(buf)?;
+        if written != buf.len() {
+            return Err(Error::PartialWrite {
+                expected: buf.len(),
+                actual: written,
+            });
+        }
+        Ok(())
+    }
+
+    fn write_ajazz_packet(&mut self, packet: &[u8; AJAZZ_PACKET_SIZE]) -> Result<(), Error> {
+        #[cfg(windows)]
+        let packet = ajazz_output_report_with_id(packet);
+
+        self.write_checked(packet.as_slice())
+    }
+
+    /// Drain a pending device ACK after an image transfer.
+    ///
+    /// Reads from the device with a timeout and checks for the `ACK\0\0OK\0`
+    /// header.  Returns `Ok(())` when an ACK (with or without a button-id)
+    /// is received, or when no data is available within the timeout.  Logs
+    /// warnings for unexpected data.
+    fn drain_ajazz_ack(&mut self, timeout: Duration) -> Result<(), Error> {
+        let mut buf = [0u8; AJAZZ_PACKET_SIZE];
+        let read = match self.device.read_timeout(&mut buf, timeout.as_millis() as i32) {
+            Ok(n) => n,
+            Err(error) => {
+                debug!("ack drain read error (non-fatal): {error}");
+                return Ok(());
+            }
+        };
+        if read == 0 {
+            debug!("no pending ack after image transfer");
+            return Ok(());
+        }
+        if read >= AJAZZ_INPUT_MIN_LEN && buf[..8] == *b"ACK\0\0OK\0" {
+            let button_id = buf[9];
+            if ajazz_device_to_user(button_id).is_some() {
+                warn!(
+                    "button release event consumed during ack drain (key_id={button_id}) - \
+                     user may need to press the button again"
+                );
+            } else {
+                debug!("image transfer acknowledged by device");
+            }
+        } else {
+            warn!(
+                "unexpected data in ack drain buffer (read={read}, first_byte=0x{:02x})",
+                buf[0]
+            );
+        }
+        Ok(())
     }
 
     /// Writes the image report header to the given buffer
@@ -645,5 +855,74 @@ impl Default for TextOptions {
 fn rgb_to_bgr(data: &mut Vec<u8>) {
     for chunk in data.chunks_exact_mut(3) {
         chunk.swap(0, 2);
+    }
+}
+
+fn parse_ajazz_input_report(bytes_read: usize, buf: &[u8; AJAZZ_PACKET_SIZE]) -> InputEvent {
+    if bytes_read < AJAZZ_INPUT_MIN_LEN {
+        return InputEvent::Unknown;
+    }
+
+    let button_id = buf[9];
+    if buf[..8] == *b"ACK\0\0OK\0" {
+        if let Some(key) = ajazz_device_to_user(button_id) {
+            InputEvent::ButtonReleased(key)
+        } else {
+            InputEvent::Ack
+        }
+    } else if let Some(key) = ajazz_device_to_user(button_id) {
+        warn!(
+            "button release without ACK header, device_id=0x{:02x} - possible corrupted report",
+            button_id
+        );
+        InputEvent::ButtonReleased(key)
+    } else {
+        InputEvent::Unknown
+    }
+}
+
+fn ajazz_device_to_user(device_id: u8) -> Option<u8> {
+    AJAZZ_USER_TO_DEVICE
+        .iter()
+        .position(|candidate| *candidate == device_id)
+        .and_then(|index| u8::try_from(index).ok())
+}
+
+#[cfg(windows)]
+fn ajazz_output_report_with_id(packet: &[u8; AJAZZ_PACKET_SIZE]) -> [u8; AJAZZ_PACKET_SIZE + 1] {
+    let mut report = [0u8; AJAZZ_PACKET_SIZE + 1];
+    report[0] = 0x00;
+    report[1..].copy_from_slice(packet);
+    report
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{InputEvent, parse_ajazz_input_report};
+
+    #[test]
+    fn parses_ajazz_ack_and_release_events() {
+        let mut ack = [0u8; super::AJAZZ_PACKET_SIZE];
+        ack[..8].copy_from_slice(b"ACK\0\0OK\0");
+        assert_eq!(parse_ajazz_input_report(512, &ack), InputEvent::Ack);
+
+        let mut release = [0u8; super::AJAZZ_PACKET_SIZE];
+        release[..8].copy_from_slice(b"ACK\0\0OK\0");
+        release[9] = 0x0d;
+        assert_eq!(
+            parse_ajazz_input_report(512, &release),
+            InputEvent::ButtonReleased(0)
+        );
+    }
+
+    #[test]
+    fn maps_all_ajazz_button_ids_to_logical_indices() {
+        let mut release = [0u8; super::AJAZZ_PACKET_SIZE];
+        release[..8].copy_from_slice(b"ACK\0\0OK\0");
+        release[9] = 0x12;
+        assert_eq!(
+            parse_ajazz_input_report(512, &release),
+            InputEvent::ButtonReleased(17)
+        );
     }
 }
