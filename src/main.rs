@@ -1,10 +1,9 @@
-
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate simplelog;
-use simplelog::{TermLogger, LevelFilter, TerminalMode, ColorChoice};
+use simplelog::{ColorChoice, LevelFilter, TermLogger, TerminalMode};
 
-extern crate structopt;
-use structopt::StructOpt;
+use clap::{Parser, Subcommand};
 
 extern crate humantime;
 use humantime::Duration;
@@ -15,39 +14,38 @@ pub use streamdeck::{InputEvent, InputManager};
 
 
 
-#[derive(StructOpt)]
-#[structopt(name = "streamdeck-cli", about = "A CLI for the Elgato StreamDeck")]
+#[derive(Parser)]
+#[command(name = "streamdeck-cli", about = "A CLI for the Elgato StreamDeck")]
 struct Options {
-
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     cmd: Commands,
 
-    #[structopt(flatten)]
+    #[command(flatten)]
     filter: Filter,
 
-    #[structopt(long = "log-level", default_value = "info")]
+    #[arg(long = "log-level", default_value = "info")]
     /// Enable verbose logging
     level: LevelFilter,
 }
 
-#[derive(StructOpt)]
+#[derive(Subcommand)]
 pub enum Commands {
     /// Reset the attached device
     Reset,
     /// Fetch the device firmware version
     Version,
     /// Set device display brightness
-    SetBrightness{
+    SetBrightness {
         /// Brightness value from 0 to 100
         brightness: u8,
     },
     /// Fetch button states
     GetButtons {
-        #[structopt(long)]
+        #[arg(long)]
         /// Timeout for button reading
         timeout: Option<Duration>,
 
-        #[structopt(long)]
+        #[arg(long)]
         /// Read continuously
         continuous: bool,
     },
@@ -67,7 +65,7 @@ pub enum Commands {
         /// Index of button to be set
         key: u8,
 
-        #[structopt(flatten)]
+        #[command(flatten)]
         colour: Colour,
     },
     /// Set button images
@@ -78,7 +76,7 @@ pub enum Commands {
         /// Image file to be loaded
         file: String,
 
-        #[structopt(flatten)]
+        #[command(flatten)]
         opts: ImageOptions,
     },
     Probe,
@@ -86,26 +84,34 @@ pub enum Commands {
 
 fn main() {
     // Parse options
-    let opts = Options::from_args();
+    let opts = Options::parse();
 
     // Setup logging
     let mut config = simplelog::ConfigBuilder::new();
     config.set_time_level(LevelFilter::Off);
 
-    TermLogger::init(opts.level, config.build(), TerminalMode::Mixed, ColorChoice::Auto).unwrap();
+    TermLogger::init(
+        opts.level,
+        config.build(),
+        TerminalMode::Mixed,
+        ColorChoice::Auto,
+    )
+    .unwrap();
 
     // Connect to device
     let mut deck = match StreamDeck::connect(opts.filter.vid, opts.filter.pid, opts.filter.serial) {
         Ok(d) => d,
         Err(e) => {
             error!("Error connecting to streamdeck: {:?}", e);
-            return
+            return;
         }
     };
 
     let serial = deck.serial().unwrap();
-    info!("Connected to device (vid: {:04x} pid: {:04x} serial: {})", 
-            opts.filter.vid, opts.filter.pid, serial);
+    info!(
+        "Connected to device (vid: {:04x} pid: {:04x} serial: {})",
+        opts.filter.vid, opts.filter.pid, serial
+    );
 
     // Run the command
     if let Err(e) = do_command(deck, opts.cmd) {
@@ -117,22 +123,23 @@ fn do_command(mut deck: StreamDeck, cmd: Commands) -> Result<(), Error> {
     match cmd {
         Commands::Reset => {
             deck.reset()?;
-        },
+        }
         Commands::Version => {
             let version = deck.version()?;
             info!("Firmware version: {}", version);
         }
-        Commands::SetBrightness{brightness} => {
+        Commands::SetBrightness { brightness } => {
             deck.set_brightness(brightness)?;
-        },
-        Commands::GetButtons{timeout, continuous} => {
-            loop {
-                let buttons = deck.read_buttons(timeout.map(|t| *t ))?;
-                info!("buttons: {:?}", buttons);
+        }
+        Commands::GetButtons {
+            timeout,
+            continuous,
+        } => loop {
+            let buttons = deck.read_buttons(timeout.map(|t| *t))?;
+            info!("buttons: {:?}", buttons);
 
-                if !continuous {
-                    break
-                }
+            if !continuous {
+                break;
             }
         },
         #[cfg(feature = "input-manager")]
@@ -159,11 +166,11 @@ fn do_command(mut deck: StreamDeck, cmd: Commands) -> Result<(), Error> {
                 }
             }
         },
-        Commands::SetColour{key, colour} => {
+        Commands::SetColour { key, colour } => {
             info!("Setting key {} colour to: ({:?})", key, colour);
             deck.set_button_rgb(key, &colour)?;
-        },
-        Commands::SetImage{key, file, opts} => {
+        }
+        Commands::SetImage { key, file, opts } => {
             info!("Setting key {} to image: {}", key, file);
             deck.set_button_file(key, &file, &opts)?;
         }
