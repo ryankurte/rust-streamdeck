@@ -19,6 +19,12 @@ pub use crate::images::{Colour, ImageOptions};
 
 pub mod info;
 pub use info::*;
+pub use info::Kind;
+
+#[cfg(feature = "input-manager")]
+pub mod input;
+#[cfg(feature = "input-manager")]
+pub use input::*;
 
 use imageproc::drawing::draw_text_mut;
 use std::str::FromStr;
@@ -26,7 +32,7 @@ use thiserror::Error;
 
 /// StreamDeck object
 pub struct StreamDeck {
-    kind: Kind,
+    pub kind: Kind,
     device: HidDevice,
 }
 
@@ -173,7 +179,6 @@ impl StreamDeck {
             pids::MK2 => Kind::Mk2,
             pids::REVISED_MINI => Kind::RevisedMini,
             pids::PLUS => Kind::Plus,
-
             pids::MODULE_6_KEYS => Kind::Module6Keys,
             pids::MODULE_15_KEYS => Kind::Module15Keys,
             pids::MODULE_32_KEYS => Kind::Module32Keys,
@@ -332,6 +337,7 @@ impl StreamDeck {
         Ok(())
     }
 
+
     /// Probe for connected devices. 
     /// 
     /// Returns a list of results, 
@@ -365,6 +371,23 @@ impl StreamDeck {
         Ok(available_devices)
     }
 
+    /// Read input from the device
+    /// 
+    /// This is a raw read of the device input intended for the input managerand is not recommended for general use.
+    #[cfg(feature = "input-manager")]
+    pub fn read_input(&mut self, timeout: Option<Duration>) -> Result<[u8; 36], Error> {
+        let mut cmd = [0u8; 36];
+        
+        match timeout {
+            Some(t) => self
+                .device
+                .read_timeout(&mut cmd, t.as_millis() as i32)?,
+            None => self.device.read(&mut cmd)?,
+        };
+
+        Ok(cmd)
+    }
+
     /// Fetch button states
     ///
     /// In blocking mode this will wait until a report packet has been received
@@ -390,15 +413,14 @@ impl StreamDeck {
             return Err(Error::NoData);
         }
 
-        if self.kind == Kind::Plus {
-            //If the second byte is not 0, a dial or the touchscreen was used, we don't support that here
-            //This would write to indices which represent buttons and thus create faulty output
-            if cmd[1] != 0 {
-                return Err(Error::UnsupportedInput);
-            }
+        // If the second byte on SD Plus is not 0, a dial or the touchscreen was used, we don't support that here.
+        // This would write to indices which represent buttons here and thus create faulty output
+        if self.kind == Kind::Plus && cmd[1] != 0 {
+             return Err(Error::UnsupportedInput);
         }
-
+        
         let mut out = vec![0u8; keys];
+
         match self.kind.key_direction() {
             KeyDirection::RightToLeft => {
                 for (i, val) in out.iter_mut().enumerate() {
@@ -544,7 +566,7 @@ impl StreamDeck {
 
     /// Transforms a key from zero-indexed left-to-right into the device-correct coordinate system
     fn translate_key_index(&self, key: u8) -> Result<u8, Error> {
-        if key > self.kind.keys() {
+        if key >= self.kind.keys() {
             return Err(Error::InvalidKeyIndex);
         }
         if self.kind().is_ajazz() {

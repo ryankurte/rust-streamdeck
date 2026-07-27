@@ -29,10 +29,11 @@ Features:
   - [x] Stream Deck Original (untested)
   - [x] Stream Deck Original V2
   - [x] Stream Deck XL
+  - [x] Stream Deck Plus (dials and touchscreen require the `input-manager` feature; setting the touchscreen image is not yet supported)
   - [x] Stream Deck Module 6Keys
   - [x] Stream Deck Module 15Keys
   - [x] Stream Deck Module 32Keys (untested)
-
+- [x] Optional `input-manager` as a higher level wrapper for translating raw HID reports into high-level input events. Needs to be enabled using the `input-manager` feature flag.
 
 ## Getting started
 
@@ -80,6 +81,56 @@ SUBCOMMANDS:
     version           Fetch the device firmware version
 
 ```
+
+
+### Using the input manager
+
+The `InputManager` provides a stateful, high-level interface for reading input from Stream Deck devices. Instead of interpreting raw HID reports yourself, it tracks button, dial, and touchscreen state and emits discrete `InputEvent` values with press/release semantics.
+
+Enable it via the `input-manager` feature (on by default):
+
+```toml
+streamdeck = { version = "0.10", features = ["input-manager"] }
+```
+
+The `InputManager` takes ownership of the `StreamDeck` instance:
+
+```rust
+use streamdeck::{StreamDeck, InputManager};
+
+let vendor_id = 0x0fd9; // Elgato
+let product_id = 0x0084; // Stream Deck Plus
+
+let deck = StreamDeck::connect(vendor_id, product_id, None)?;
+let mut manager = InputManager::new(deck);
+
+loop {
+    let events = manager.handle_input(None)?;
+    for event in events {
+        match event {
+            InputEvent::Button { index, action } => {
+                println!("Button {index}: {action:?}");
+            }
+            InputEvent::Dial { index, action } => {
+                // Stream Deck Plus only
+                println!("Dial {index}: {action:?}");
+            }
+            InputEvent::Touch { x, y, action } => {
+                // Stream Deck Plus only
+                println!("Touch at ({x}, {y}): {action:?}");
+            }
+        }
+    }
+}
+```
+
+`handle_input` accepts an optional `Duration` timeout. It returns a `Vec<InputEvent>` which can contain any combination of:
+
+- **`InputEvent::Button`** — a button was pressed or released (all devices)
+- **`InputEvent::Dial`** — a dial was pressed, released, or turned with a signed delta (Stream Deck Plus only)
+- **`InputEvent::Touch`** — a short tap, long press, or drag on the touchscreen (Stream Deck Plus only)
+
+The manager internally tracks which buttons and dials are currently held down, so each physical press and release produces exactly one event.
 
 ## Related Works
 

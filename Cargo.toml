@@ -9,7 +9,8 @@ license = "MPL-2.0"
 edition = "2018"
 
 [features]
-util = [ "clap", "simplelog", "humantime" ]
+util = [ "structopt", "simplelog", "humantime" ]
+input-manager = []
 default = [ "util" ]
 
 [dependencies]
