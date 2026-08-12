@@ -32,6 +32,7 @@ Features:
   - [x] Stream Deck Module 6Keys
   - [x] Stream Deck Module 15Keys
   - [x] Stream Deck Module 32Keys (untested)
+  - [x] Ajazz AKP 153
 
 
 ## Getting started
