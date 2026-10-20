@@ -131,6 +131,7 @@ pub mod pids {
     pub const ORIGINAL_V2: u16 = 0x006d;
     pub const MINI: u16 = 0x0063;
     pub const XL: u16 = 0x006c;
+    pub const XL_V2: u16 = 0x008f;
     pub const MK2: u16 = 0x0080;
     pub const REVISED_MINI: u16 = 0x0090;
     pub const PLUS: u16 = 0x0084;
@@ -169,7 +170,7 @@ impl StreamDeck {
             pids::MINI => Kind::Mini,
 
             pids::ORIGINAL_V2 => Kind::OriginalV2,
-            pids::XL => Kind::Xl,
+            pids::XL | pids::XL_V2 => Kind::Xl,
             pids::MK2 => Kind::Mk2,
             pids::REVISED_MINI => Kind::RevisedMini,
             pids::PLUS => Kind::Plus,
@@ -344,6 +345,7 @@ impl StreamDeck {
                 let deck = match device.product_id() {
                     pids::MK2 => Ok((Kind::Mk2, pids::MK2)),
                     pids::XL => Ok((Kind::Xl, pids::XL)),
+                    pids::XL_V2 => Ok((Kind::Xl, pids::XL_V2)),
                     pids::ORIGINAL_V2 => Ok((Kind::OriginalV2, pids::ORIGINAL_V2)),
                     pids::ORIGINAL => Ok((Kind::Original, pids::ORIGINAL)),
                     pids::MINI => Ok((Kind::Mini, pids::MINI)),

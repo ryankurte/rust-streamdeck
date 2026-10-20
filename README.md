@@ -29,6 +29,7 @@ Features:
   - [x] Stream Deck Original (untested)
   - [x] Stream Deck Original V2
   - [x] Stream Deck XL
+  - [x] Stream Deck XL V2
   - [x] Stream Deck Module 6Keys
   - [x] Stream Deck Module 15Keys
   - [x] Stream Deck Module 32Keys (untested)
