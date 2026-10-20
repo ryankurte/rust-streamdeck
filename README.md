@@ -32,6 +32,9 @@ Features:
   - [x] Stream Deck Module 6Keys
   - [x] Stream Deck Module 15Keys
   - [x] Stream Deck Module 32Keys (untested)
+  - [x] Stream Deck Studio
+  - [ ] Stream Deck +
+  - [ ] Stream Deck XL+
 
 
 ## Getting started

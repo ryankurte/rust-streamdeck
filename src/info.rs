@@ -12,6 +12,7 @@ pub enum Kind {
     Module15Keys,
     Module32Keys,
     AjazzAkp153,
+    Studio,
 }
 
 /// Stream Deck key layout direction
@@ -64,6 +65,7 @@ impl Kind {
             Kind::Module15Keys => 15,
             Kind::Module32Keys => 32,
             Kind::AjazzAkp153 => 18,
+            Kind::Studio => 32,
         }
     }
 
@@ -78,6 +80,7 @@ impl Kind {
             Kind::Module6Keys => 1,
             Kind::Module15Keys => 3,
             Kind::Module32Keys => 3,
+            Kind::Studio => 3,
             Kind::AjazzAkp153 => 0,
         }
     }
@@ -103,6 +106,7 @@ impl Kind {
             Kind::Original | Kind::OriginalV2 | Kind::Mk2 | Kind::Module15Keys => 5,
             Kind::Xl | Kind::Module32Keys => 8,
             Kind::Plus => 4,
+            Kind::Studio => 16,
             Kind::AjazzAkp153 => 5,
         }
     }
@@ -110,7 +114,7 @@ impl Kind {
     pub fn image_mode(&self) -> ImageMode {
         match self {
             Kind::Original | Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => ImageMode::Bmp,
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 => ImageMode::Jpeg,
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 | Kind::Studio => ImageMode::Jpeg,
         }
     }
 
@@ -120,6 +124,7 @@ impl Kind {
             Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => (80, 80),
             Kind::Xl | Kind::Module32Keys => (96, 96),
             Kind::Plus => (120, 120),
+            Kind::Studio => (144, 112),
             Kind::AjazzAkp153 => (85, 85),
         }
     }
@@ -135,7 +140,7 @@ impl Kind {
     pub fn image_mirror(&self) -> Mirroring {
         match self {
             // Mini has rotation, not mirror
-            Kind::Mini | Kind::RevisedMini | Kind::Plus | Kind::Module6Keys | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 => Mirroring::None,
+            Kind::Mini | Kind::RevisedMini | Kind::Plus | Kind::Module6Keys | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 | Kind::Studio => Mirroring::None,
             // On the original the image is flipped across the Y axis
             Kind::Original => Mirroring::Y,
             // On the V2 devices, both X and Y need to flip
@@ -160,7 +165,7 @@ impl Kind {
         match self {
             Kind::Original | Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => 16,
             Kind::AjazzAkp153 => 0,
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys => 8
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys | Kind::Studio => 8
         }
     }
 
@@ -170,20 +175,20 @@ impl Kind {
             Kind::Original => &ORIGINAL_IMAGE_BASE,
             Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => &MINI_IMAGE_BASE,
 
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 => &[],
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 | Kind::Studio => &[],
         }
     }
 
     pub(crate) fn image_colour_order(&self) -> ColourOrder {
         match self {
             Kind::Original | Kind::Mini | Kind::RevisedMini | Kind::Module6Keys => ColourOrder::BGR,
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 => ColourOrder::RGB,
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Module15Keys | Kind::Module32Keys | Kind::AjazzAkp153 | Kind::Studio => ColourOrder::RGB,
         }
     }
 
     pub(crate) fn is_v2(&self) -> bool {
         match self {
-            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus => true,
+            Kind::OriginalV2 | Kind::Xl | Kind::Mk2 | Kind::Plus | Kind::Studio => true,
             _ => false,
         }
     }
@@ -216,3 +221,4 @@ const MINI_IMAGE_BASE: [u8; 54] = [
     0x00, 0x00, 0xc0, 0x3c, 0x00, 0x00, 0xc4, 0x0e, 0x00, 0x00, 0xc4, 0x0e, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
+

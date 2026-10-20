@@ -139,6 +139,7 @@ pub mod pids {
     pub const MODULE_32_KEYS: u16 = 0x00BA;
     pub const AJAZZ_AKP153: u16 = 0x1125;
     pub const GK150K: u16 = 0x1000;
+    pub const STUDIO: u16 = 0x00AA;
 }
 
 /// Device USB Vendor Identifiers (VIDs).
@@ -178,6 +179,7 @@ impl StreamDeck {
             pids::MODULE_15_KEYS => Kind::Module15Keys,
             pids::MODULE_32_KEYS => Kind::Module32Keys,
             pids::AJAZZ_AKP153 | pids::GK150K => Kind::AjazzAkp153,
+            pids::STUDIO => Kind::Studio,
 
             _ => return Err(Error::UnrecognisedPID),
         };
@@ -926,3 +928,4 @@ mod tests {
         );
     }
 }
+
